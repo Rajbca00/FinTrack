@@ -1,0 +1,48 @@
+import { Router } from "express";
+import { z } from "zod";
+import { getTrend, getCategoryBreakdown, getBalances } from "../services/summary";
+
+export const summaryRouter = Router();
+
+const filterSchema = z.object({
+  period: z.enum(["week", "month", "year"]).default("month"),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  accountId: z.string().optional(),
+  groupId: z.string().optional(),
+});
+
+summaryRouter.get("/trend", async (req, res) => {
+  const parsed = filterSchema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { period, from, to, accountId, groupId } = parsed.data;
+  const trend = await getTrend({
+    period,
+    from: from ? new Date(from) : undefined,
+    to: to ? new Date(to) : undefined,
+    accountId,
+    groupId,
+  });
+  res.json(trend);
+});
+
+const breakdownSchema = filterSchema.extend({ type: z.enum(["INCOME", "EXPENSE"]).default("EXPENSE") });
+
+summaryRouter.get("/breakdown", async (req, res) => {
+  const parsed = breakdownSchema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { from, to, accountId, groupId, type } = parsed.data;
+  const breakdown = await getCategoryBreakdown({
+    from: from ? new Date(from) : undefined,
+    to: to ? new Date(to) : undefined,
+    accountId,
+    groupId,
+    type,
+  });
+  res.json(breakdown);
+});
+
+summaryRouter.get("/balances", async (_req, res) => {
+  const balances = await getBalances();
+  res.json(balances);
+});

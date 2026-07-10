@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite has no native enum support in Prisma, so the enum-like fields below
+// are plain Strings constrained by the zod schemas in each route handler:
+//   AccountType:  BANK | CREDIT_CARD
+//   CategoryType: INCOME | EXPENSE | TRANSFER
+//   MatchType:    CONTAINS | STARTS_WITH | REGEX | EXACT
+//   TransferType: ACCOUNT_TRANSFER | GROUP_REALLOCATION
+
+// A bank account or credit card. Balances are never stored directly on the
+// account - they are derived from the opening balances + transactions of
+// its Groups, so a "multi-purpose" account is just an account with more
+// than one Group.
+model Account {
+  id            String        @id @default(cuid())
+  name          String
+  type          String
+  institution   String?
+  last4         String?
+  currency      String        @default("INR")
+  creditLimit   Float?
+  isMultiPurpose Boolean      @default(false)
+  archived      Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  groups        Group[]
+  transactions  Transaction[]
+  importBatches ImportBatch[]
+}
+
+// A fund/purpose flag scoped to one account, e.g. "Personal" and
+// "Temple Fund" both living inside the same ICICI account. Every
+// transaction belongs to exactly one group. Every account gets a
+// "General" default group automatically.
+model Group {
+  id             String        @id @default(cuid())
+  name           String
+  color          String?
+  accountId      String
+  account        Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  isDefault      Boolean       @default(false)
+  openingBalance Float         @default(0)
+  archived       Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  transactions   Transaction[]
+
+  @@unique([accountId, name])
+}
+
+model Category {
+  id           String         @id @default(cuid())
+  name         String         @unique
+  type         String
+  color        String?
+  icon         String?
+  isSystem     Boolean        @default(false)
+  parentId     String?
+  parent       Category?      @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Category[]     @relation("CategoryHierarchy")
+  rules        CategoryRule[]
+  transactions Transaction[]
+}
+
+model CategoryRule {
+  id         String       @id @default(cuid())
+  pattern    String
+  matchType  String       @default("CONTAINS")
+  amountSign String       @default("ANY") // ANY | DEBIT | CREDIT
+  priority   Int          @default(0)
+  isActive   Boolean      @default(true)
+  categoryId String
+  category   Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+}
+
+model Transaction {
+  id             String       @id @default(cuid())
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  groupId        String
+  group          Group        @relation(fields: [groupId], references: [id])
+  date           DateTime
+  description    String
+  rawDescription String?
+  amount         Float        // positive = inflow/credit, negative = outflow/debit
+  categoryId     String?
+  category       Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  notes          String?
+  isTransfer     Boolean      @default(false)
+  transferId     String?
+  transfer       Transfer?    @relation(fields: [transferId], references: [id], onDelete: SetNull)
+  importBatchId  String?
+  importBatch    ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  dedupeKey      String?      // hash of date+description+amount, used to skip duplicate imports
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([accountId, date])
+  @@index([groupId])
+  @@index([categoryId])
+  @@unique([accountId, dedupeKey])
+}
+
+// One Transfer groups the 2 Transaction legs it creates - either moving
+// real money between two Accounts, or reallocating funds between two
+// Groups inside the same Account (net zero at the account level).
+model Transfer {
+  id           String        @id @default(cuid())
+  type         String
+  date         DateTime
+  amount       Float
+  note         String?
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+}
+
+model ImportBatch {
+  id                String        @id @default(cuid())
+  accountId         String
+  account           Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  filename          String
+  importedAt        DateTime      @default(now())
+  rowCount          Int
+  skippedDuplicates Int           @default(0)
+  transactions      Transaction[]
+}
