@@ -27,6 +27,11 @@ model Account {
   currency      String        @default("INR")
   creditLimit   Float?
   isMultiPurpose Boolean      @default(false)
+  // Remembers the last CSV column mapping + target group used for this
+  // account's imports, so re-importing a statement from the same bank
+  // doesn't require re-picking columns every time. JSON-encoded ColumnMapping.
+  lastImportMapping String?
+  lastImportGroupId String?
   archived      Boolean       @default(false)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

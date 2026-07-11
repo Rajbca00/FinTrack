@@ -167,6 +167,10 @@ export type ImportPreview = {
     creditColumn: string | null;
     amountColumn: string | null;
   };
+  // The mapping (and target group) used the last time this account was imported into,
+  // returned only when it's still valid for this file's actual headers.
+  savedMapping: ColumnMapping | null;
+  savedGroupId: string | null;
   groups: Group[];
 };
 export const previewImport = (accountId: string, fileContent: string, filename: string) =>

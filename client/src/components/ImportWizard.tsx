@@ -21,9 +21,29 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
   const [creditColumn, setCreditColumn] = useState("");
   const [groupId, setGroupId] = useState(groups.find((g) => g.isDefault)?.id ?? groups[0]?.id ?? "");
   const [applyRules, setApplyRules] = useState(true);
+  const [usingSavedMapping, setUsingSavedMapping] = useState(false);
   const [result, setResult] = useState<{ created: number; skipped: number; total: number } | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const applyMapping = (mapping: {
+    dateColumn: string | null;
+    descriptionColumn: string | null;
+    debitColumn?: string | null;
+    creditColumn?: string | null;
+    amountColumn?: string | null;
+  }) => {
+    setDateColumn(mapping.dateColumn ?? "");
+    setDescriptionColumn(mapping.descriptionColumn ?? "");
+    if (mapping.debitColumn || mapping.creditColumn) {
+      setAmountMode("debitCredit");
+      setDebitColumn(mapping.debitColumn ?? "");
+      setCreditColumn(mapping.creditColumn ?? "");
+    } else {
+      setAmountMode("single");
+      setAmountColumn(mapping.amountColumn ?? "");
+    }
+  };
 
   const handleFile = async (file: File) => {
     setError("");
@@ -34,16 +54,14 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
       setFileContent(content);
       const p = await previewImport(accountId, content, file.name);
       setPreview(p);
-      setDateColumn(p.suggestedMapping.dateColumn ?? "");
-      setDescriptionColumn(p.suggestedMapping.descriptionColumn ?? "");
-      if (p.suggestedMapping.debitColumn || p.suggestedMapping.creditColumn) {
-        setAmountMode("debitCredit");
-        setDebitColumn(p.suggestedMapping.debitColumn ?? "");
-        setCreditColumn(p.suggestedMapping.creditColumn ?? "");
+      if (p.savedMapping) {
+        applyMapping(p.savedMapping);
+        setUsingSavedMapping(true);
       } else {
-        setAmountMode("single");
-        setAmountColumn(p.suggestedMapping.amountColumn ?? "");
+        applyMapping(p.suggestedMapping);
+        setUsingSavedMapping(false);
       }
+      if (p.savedGroupId) setGroupId(p.savedGroupId);
       setMode("map");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not read this file");
@@ -100,6 +118,35 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {preview.rowCount} row(s) detected in {filename}. Confirm the column mapping below.
           </p>
+
+          {usingSavedMapping ? (
+            <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+              <span>Using the mapping you last used for this account.</span>
+              <button
+                className="font-medium underline"
+                onClick={() => {
+                  applyMapping(preview.suggestedMapping);
+                  setUsingSavedMapping(false);
+                }}
+              >
+                Reset to auto-detected
+              </button>
+            </div>
+          ) : preview.savedMapping ? (
+            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+              <span>Using auto-detected columns.</span>
+              <button
+                className="font-medium text-blue-600 underline dark:text-blue-400"
+                onClick={() => {
+                  applyMapping(preview.savedMapping!);
+                  setUsingSavedMapping(true);
+                  if (preview.savedGroupId) setGroupId(preview.savedGroupId);
+                }}
+              >
+                Use last saved mapping instead
+              </button>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

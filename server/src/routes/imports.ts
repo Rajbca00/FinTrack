@@ -25,11 +25,34 @@ importsRouter.post("/:accountId/preview", async (req, res) => {
   const { headers, rows } = parseCsv(parsed.data.fileContent);
   if (headers.length === 0) return res.status(400).json({ error: "Could not find a header row in this CSV" });
 
+  // Only offer the account's last mapping back if this file actually has the
+  // same columns - a different statement format uploaded to the same account
+  // shouldn't silently reuse a stale mapping.
+  let savedMapping: ColumnMapping | null = null;
+  if (account.lastImportMapping) {
+    try {
+      const candidate = JSON.parse(account.lastImportMapping) as ColumnMapping;
+      const referencedColumns = [candidate.dateColumn, candidate.descriptionColumn, candidate.amountColumn, candidate.debitColumn, candidate.creditColumn].filter(
+        (c): c is string => Boolean(c)
+      );
+      if (referencedColumns.every((c) => headers.includes(c))) {
+        savedMapping = candidate;
+      }
+    } catch {
+      // ignore malformed stored mapping
+    }
+  }
+
+  const savedGroupId =
+    account.lastImportGroupId && account.groups.some((g) => g.id === account.lastImportGroupId) ? account.lastImportGroupId : null;
+
   res.json({
     headers,
     sampleRows: rows.slice(0, 10),
     rowCount: rows.length,
     suggestedMapping: suggestMapping(headers),
+    savedMapping,
+    savedGroupId,
     groups: account.groups,
   });
 });
@@ -112,6 +135,10 @@ importsRouter.post("/:accountId/confirm", async (req, res) => {
   }
 
   await prisma.importBatch.update({ where: { id: batch.id }, data: { skippedDuplicates: skipped } });
+  await prisma.account.update({
+    where: { id: accountId },
+    data: { lastImportMapping: JSON.stringify(mapping), lastImportGroupId: groupId },
+  });
 
   res.status(201).json({ batchId: batch.id, created, skipped, total: normalized.length });
 });
