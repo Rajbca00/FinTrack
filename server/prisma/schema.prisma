@@ -3,12 +3,13 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// SQLite has no native enum support in Prisma, so the enum-like fields below
-// are plain Strings constrained by the zod schemas in each route handler:
+// These fields are kept as plain Strings (constrained by the zod schemas in
+// each route handler) rather than native Postgres enums, so the app code
+// didn't need to change when the datasource moved from SQLite to Postgres:
 //   AccountType:  BANK | CREDIT_CARD
 //   CategoryType: INCOME | EXPENSE | TRANSFER
 //   MatchType:    CONTAINS | STARTS_WITH | REGEX | EXACT
