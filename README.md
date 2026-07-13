@@ -36,21 +36,32 @@ own funds and a temple/trust fund you manage, inside the same ICICI account).
 
 ## Stack
 
-- `server/`: Node.js, Express, TypeScript, Prisma (SQLite), zod.
+- `server/`: Node.js, Express, TypeScript, Prisma (PostgreSQL), zod.
 - `client/`: React, TypeScript, Vite, Tailwind CSS v4, TanStack Query, Recharts.
 
-## Getting started
+In production, the server also serves the built client as static files (plus a
+SPA fallback), so the whole app is one Node web service - see **Deployment** below.
+
+## Getting started (local development)
+
+You need a Postgres database to point at. The quickest option locally is Docker:
+`docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16`, or install
+Postgres directly. A free hosted Postgres (e.g. [Neon](https://neon.tech)) also
+works fine for local dev - just put its connection string in `.env`.
 
 ### 1. Server
 
 ```bash
 cd server
 npm install
-cp .env.example .env      # if you haven't already
-npx prisma migrate dev    # creates server/prisma/dev.db and applies the schema
-npx tsx prisma/seed.ts    # seeds default categories and auto-categorization rules
-npm run dev               # starts the API on http://localhost:4000
+cp .env.example .env       # then edit DATABASE_URL to point at your Postgres
+npx prisma migrate dev     # applies the schema
+npx tsx prisma/seed.ts     # seeds default categories and auto-categorization rules
+npm run dev                # starts the API on http://localhost:4000
 ```
+
+`BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD_HASH` can be left blank in `.env` for
+local dev - the auth gate only enforces itself when `NODE_ENV=production`.
 
 ### 2. Client
 
@@ -63,11 +74,59 @@ npm run dev               # starts the app on http://localhost:5173
 The client dev server proxies `/api` requests to `http://localhost:4000`, so run
 both at once.
 
-### Database
+### Resetting the database
 
-SQLite is used for simplicity — the database is a single file at
-`server/prisma/dev.db`. To reset it: delete that file, then re-run
-`npx prisma migrate deploy` and `npx tsx prisma/seed.ts`.
+`npx prisma migrate reset` (from `server/`) drops and recreates all tables, then
+you'll need to re-run the seed script.
+
+## Deployment (Render + Neon, both free)
+
+This app is one Node web service (API + static frontend) backed by Postgres.
+Render's free web-service plan has no persistent disk, and its free Postgres
+expires after 30 days - so the database lives on [Neon](https://neon.tech)
+instead, which has a free tier that persists indefinitely.
+
+### 1. Create the database (Neon)
+
+1. Sign up at [neon.tech](https://neon.tech) and create a project.
+2. Copy the connection string it gives you (starts with `postgresql://...`,
+   include `?sslmode=require`).
+
+### 2. Generate your login credentials
+
+The whole app is gated behind a single shared username/password (HTTP Basic
+Auth), since it holds real financial data and will be reachable at a public
+URL. Pick a password and hash it:
+
+```bash
+cd server
+npm run hash-password -- "your-password-here"
+```
+
+Keep the printed hash - you'll paste it into Render as `BASIC_AUTH_PASSWORD_HASH`.
+
+### 3. Deploy (Render)
+
+1. Push this repo to GitHub (already done if you're reading this from the repo).
+2. In the Render dashboard: **New → Blueprint**, point it at this repo. Render
+   will read `render.yaml` at the repo root and configure the service
+   automatically (free plan, build command, start command, health check).
+3. When prompted for the env vars marked `sync: false`, fill in:
+   - `DATABASE_URL` - the Neon connection string from step 1
+   - `BASIC_AUTH_USER` - whatever username you want
+   - `BASIC_AUTH_PASSWORD_HASH` - the hash from step 2
+4. Deploy. Render runs `npm run build` (builds the client, then the server),
+   then `npm run start` (applies any pending Prisma migrations, then starts
+   the server). The first deploy will have an empty database - run the seed
+   script once against production, e.g. from your machine:
+   ```bash
+   DATABASE_URL="<your Neon connection string>" npx tsx server/prisma/seed.ts
+   ```
+5. Visit the `.onrender.com` URL Render gives you. Your browser will prompt
+   for the username/password you set in step 2/3.
+
+Every subsequent `git push` to this branch (once connected) triggers a new
+Render deploy automatically.
 
 ## Project layout
 

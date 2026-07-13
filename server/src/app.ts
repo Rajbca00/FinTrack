@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { basicAuth } from "./middleware/basicAuth";
 import { accountsRouter } from "./routes/accounts";
 import { groupsRouter } from "./routes/groups";
 import { categoriesRouter } from "./routes/categories";
@@ -11,6 +13,7 @@ import { summaryRouter } from "./routes/summary";
 
 export function createApp() {
   const app = express();
+  app.use(basicAuth);
   app.use(cors({ origin: process.env.CORS_ORIGIN ?? "http://localhost:5173" }));
   app.use(express.json({ limit: "10mb" }));
 
@@ -24,6 +27,16 @@ export function createApp() {
   app.use("/api/import", importsRouter);
   app.use("/api/transfers", transfersRouter);
   app.use("/api/summary", summaryRouter);
+
+  // In production this single Node service also serves the built React app,
+  // so Render only needs one web service (no separate static site / CDN).
+  if (process.env.NODE_ENV === "production") {
+    const clientDist = path.join(__dirname, "../../client/dist");
+    app.use(express.static(clientDist));
+    app.get(/^\/(?!api\/).*/, (_req, res) => {
+      res.sendFile(path.join(clientDist, "index.html"));
+    });
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: fintrack
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Paste the connection string from your Neon (or other Postgres) project.
+      - key: DATABASE_URL
+        sync: false
+      # Generate these with: npm run hash-password --prefix server -- "your-password"
+      - key: BASIC_AUTH_USER
+        sync: false
+      - key: BASIC_AUTH_PASSWORD_HASH
+        sync: false
