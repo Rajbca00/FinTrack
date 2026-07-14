@@ -75,6 +75,7 @@ const updateSchema = z.object({
   description: z.string().min(1).optional(),
   amount: z.number().optional(),
   categoryId: z.string().optional().nullable(),
+  accountId: z.string().optional(),
   groupId: z.string().optional(),
   notes: z.string().optional().nullable(),
 });
@@ -82,12 +83,37 @@ const updateSchema = z.object({
 transactionsRouter.put("/:id", async (req, res) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { date, ...rest } = parsed.data;
+  const { date, accountId, groupId, ...rest } = parsed.data;
+
+  const existing = await prisma.transaction.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: "Transaction not found" });
+
+  // A transfer leg's account is locked - moving it here would desync it from
+  // its paired leg, so that stays on the Transfers view (same rule as delete).
+  if (existing.isTransfer && accountId && accountId !== existing.accountId) {
+    return res.status(400).json({ error: "Edit this from the Transfers view so both legs stay in sync" });
+  }
+
+  // Moving to a different account without an explicit group falls back to
+  // that account's default group, since the current groupId won't belong to it.
+  let resolvedGroupId = groupId;
+  if (accountId && accountId !== existing.accountId) {
+    if (groupId) {
+      const group = await prisma.group.findUnique({ where: { id: groupId } });
+      if (!group || group.accountId !== accountId) {
+        return res.status(400).json({ error: "Group does not belong to the selected account" });
+      }
+    } else {
+      const defaultGroup = await prisma.group.findFirst({ where: { accountId, isDefault: true } });
+      if (!defaultGroup) return res.status(400).json({ error: "Selected account has no default group" });
+      resolvedGroupId = defaultGroup.id;
+    }
+  }
 
   const transaction = await prisma.transaction.update({
     where: { id: req.params.id },
-    data: { ...rest, date: date ? new Date(date) : undefined },
-    include: { category: true, group: true },
+    data: { ...rest, accountId, groupId: resolvedGroupId, date: date ? new Date(date) : undefined },
+    include: { category: true, group: true, account: true },
   });
   res.json(transaction);
 });

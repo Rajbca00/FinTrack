@@ -281,23 +281,57 @@ function EditTransactionModal({
   const [amount, setAmount] = useState(String(transaction.amount));
   const [categoryId, setCategoryId] = useState(transaction.categoryId ?? "");
   const [notes, setNotes] = useState(transaction.notes ?? "");
+  const [accountId, setAccountId] = useState(transaction.accountId);
+  const [groupId, setGroupId] = useState(transaction.groupId);
   const [transferToAccountId, setTransferToAccountId] = useState("");
   const [transferToGroupId, setTransferToGroupId] = useState("");
 
+  const account = accounts?.find((a) => a.id === accountId);
+
   // Only a plain transaction can be converted - one that's already a transfer
   // leg has a paired counterpart that this flow doesn't know how to update,
-  // so editing/deleting that pair stays on the Transfers page.
+  // so editing/deleting that pair (and moving it to a different account)
+  // stays on the Transfers page.
   const convertingToTransfer =
     !transaction.isTransfer && categories.find((c) => c.id === categoryId)?.type === "TRANSFER";
   const transferToAccount = accounts?.find((a) => a.id === transferToAccountId);
-  const sameAccountAndGroup =
-    transferToAccountId === transaction.accountId && transferToGroupId === transaction.groupId;
+  const sameAccountAndGroup = transferToAccountId === accountId && transferToGroupId === groupId;
 
   const saving = createTransfer.isPending || deleteTransaction.isPending;
 
   return (
     <Modal title="Edit transaction" onClose={onClose}>
       <div className="flex flex-col gap-3">
+        <div>
+          <Label>Account</Label>
+          <Select
+            value={accountId}
+            onChange={(e) => {
+              setAccountId(e.target.value);
+              const acc = accounts?.find((a) => a.id === e.target.value);
+              setGroupId(acc?.groups.find((g) => g.isDefault)?.id ?? acc?.groups[0]?.id ?? "");
+            }}
+            disabled={transaction.isTransfer}
+          >
+            {accounts?.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+        {account && account.groups.length > 1 && (
+          <div>
+            <Label>Group</Label>
+            <Select value={groupId} onChange={(e) => setGroupId(e.target.value)} disabled={transaction.isTransfer}>
+              {account.groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
         <div>
           <Label>Date</Label>
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -377,10 +411,10 @@ function EditTransactionModal({
                   date: new Date(date).toISOString(),
                   amount: legAmount,
                   note: description.trim() || undefined,
-                  fromAccountId: outgoing ? transaction.accountId : transferToAccountId,
-                  fromGroupId: outgoing ? transaction.groupId : transferToGroupId,
-                  toAccountId: outgoing ? transferToAccountId : transaction.accountId,
-                  toGroupId: outgoing ? transferToGroupId : transaction.groupId,
+                  fromAccountId: outgoing ? accountId : transferToAccountId,
+                  fromGroupId: outgoing ? groupId : transferToGroupId,
+                  toAccountId: outgoing ? transferToAccountId : accountId,
+                  toGroupId: outgoing ? transferToGroupId : groupId,
                 },
                 { onSuccess: () => deleteTransaction.mutate(transaction.id, { onSuccess: onClose }) }
               );
@@ -391,6 +425,8 @@ function EditTransactionModal({
                 amount: transaction.isTransfer ? undefined : Number(amount),
                 categoryId: categoryId || null,
                 notes: notes || null,
+                accountId: transaction.isTransfer ? undefined : accountId,
+                groupId: transaction.isTransfer ? undefined : groupId,
               });
             }
           }}
