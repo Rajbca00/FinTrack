@@ -1,16 +1,18 @@
 import { useState } from "react";
-import { useAccounts, useTransfers, useCreateTransfer, useDeleteTransfer } from "../hooks/useApi";
+import { useAccounts, useTransfers, useCreateTransfer, useUpdateTransfer, useDeleteTransfer } from "../hooks/useApi";
 import { Card, Button, Select, Input, Label } from "../components/ui";
-import { formatDate, formatMoney } from "../lib/format";
+import { formatDate, formatMoney, toDateInputValue } from "../lib/format";
 import { getErrorMessage } from "../lib/api";
-import type { TransferType } from "../lib/api";
+import type { Transfer, TransferType } from "../lib/api";
 
 export function Transfers() {
   const { data: accounts } = useAccounts();
   const { data: transfers } = useTransfers();
   const createTransfer = useCreateTransfer();
+  const updateTransfer = useUpdateTransfer();
   const deleteTransfer = useDeleteTransfer();
 
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [kind, setKind] = useState<TransferType>("ACCOUNT_TRANSFER");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [amount, setAmount] = useState("");
@@ -34,6 +36,46 @@ export function Transfers() {
     (kind === "ACCOUNT_TRANSFER"
       ? fromAccountId && fromGroupId && toAccountId && toGroupId && !(fromAccountId === toAccountId && fromGroupId === toGroupId)
       : reallocAccountId && reallocFromGroupId && reallocToGroupId && reallocFromGroupId !== reallocToGroupId);
+
+  const saving = createTransfer.isPending || updateTransfer.isPending;
+
+  function resetForm() {
+    setEditingId(null);
+    setKind("ACCOUNT_TRANSFER");
+    setDate(new Date().toISOString().slice(0, 10));
+    setAmount("");
+    setNote("");
+    setFromAccountId("");
+    setFromGroupId("");
+    setToAccountId("");
+    setToGroupId("");
+    setReallocAccountId("");
+    setReallocFromGroupId("");
+    setReallocToGroupId("");
+  }
+
+  function startEdit(t: Transfer) {
+    const from = t.transactions.find((x) => x.amount < 0);
+    const to = t.transactions.find((x) => x.amount > 0);
+    if (!from || !to) return;
+
+    setEditingId(t.id);
+    setKind(t.type);
+    setDate(toDateInputValue(t.date));
+    setAmount(String(t.amount));
+    setNote(t.note ?? "");
+    if (t.type === "ACCOUNT_TRANSFER") {
+      setFromAccountId(from.accountId);
+      setFromGroupId(from.groupId);
+      setToAccountId(to.accountId);
+      setToGroupId(to.groupId);
+    } else {
+      setReallocAccountId(from.accountId);
+      setReallocFromGroupId(from.groupId);
+      setReallocToGroupId(to.groupId);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   const submit = () => {
     // Amount is always a magnitude here - the two transfer legs get their
@@ -63,12 +105,11 @@ export function Transfers() {
             toGroupId: reallocToGroupId,
           };
 
-    createTransfer.mutate(payload, {
-      onSuccess: () => {
-        setAmount("");
-        setNote("");
-      },
-    });
+    if (editingId) {
+      updateTransfer.mutate({ id: editingId, data: payload }, { onSuccess: resetForm });
+    } else {
+      createTransfer.mutate(payload, { onSuccess: resetForm });
+    }
   };
 
   return (
@@ -81,11 +122,25 @@ export function Transfers() {
       </div>
 
       <Card className="flex flex-col gap-4">
+        {editingId && (
+          <p className="text-xs text-blue-600 dark:text-blue-400">
+            Editing an existing transfer - both linked transactions will be updated. Type can't be changed; delete and
+            recreate it for that.
+          </p>
+        )}
         <div className="flex gap-2">
-          <Button variant={kind === "ACCOUNT_TRANSFER" ? "primary" : "secondary"} onClick={() => setKind("ACCOUNT_TRANSFER")}>
+          <Button
+            variant={kind === "ACCOUNT_TRANSFER" ? "primary" : "secondary"}
+            disabled={!!editingId}
+            onClick={() => setKind("ACCOUNT_TRANSFER")}
+          >
             Account to account
           </Button>
-          <Button variant={kind === "GROUP_REALLOCATION" ? "primary" : "secondary"} onClick={() => setKind("GROUP_REALLOCATION")}>
+          <Button
+            variant={kind === "GROUP_REALLOCATION" ? "primary" : "secondary"}
+            disabled={!!editingId}
+            onClick={() => setKind("GROUP_REALLOCATION")}
+          >
             Reallocate within an account
           </Button>
         </div>
@@ -216,10 +271,19 @@ export function Transfers() {
           </div>
         </div>
 
-        <Button className="self-start" disabled={!canSubmit || createTransfer.isPending} onClick={submit}>
-          {createTransfer.isPending ? "Saving…" : "Record transfer"}
-        </Button>
-        {createTransfer.isError && <p className="text-xs text-red-500">{getErrorMessage(createTransfer.error)}</p>}
+        <div className="flex gap-2">
+          <Button disabled={!canSubmit || saving} onClick={submit}>
+            {saving ? "Saving…" : editingId ? "Update transfer" : "Record transfer"}
+          </Button>
+          {editingId && (
+            <Button variant="secondary" onClick={resetForm}>
+              Cancel edit
+            </Button>
+          )}
+        </div>
+        {(createTransfer.isError || updateTransfer.isError) && (
+          <p className="text-xs text-red-500">{getErrorMessage(createTransfer.error ?? updateTransfer.error)}</p>
+        )}
       </Card>
 
       <div>
@@ -256,6 +320,9 @@ export function Transfers() {
                     <td className="px-4 py-2 text-xs text-slate-500">{t.note ?? "—"}</td>
                     <td className="px-4 py-2 text-right font-medium">{formatMoney(t.amount)}</td>
                     <td className="px-4 py-2 text-right">
+                      <button className="mr-3 text-xs text-slate-400 hover:text-blue-500" onClick={() => startEdit(t)}>
+                        Edit
+                      </button>
                       <button
                         className="text-xs text-slate-400 hover:text-red-500"
                         onClick={() => {

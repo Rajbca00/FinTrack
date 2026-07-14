@@ -179,7 +179,12 @@ export type TransactionListParams = {
   pageSize?: number;
 };
 export const listTransactions = (params: TransactionListParams) =>
-  api.get<{ total: number; page: number; pageSize: number; transactions: Transaction[] }>("/transactions", { params }).then((r) => r.data);
+  api
+    .get<{ total: number; page: number; pageSize: number; transactions: Transaction[]; runningBalances?: Record<string, number> }>(
+      "/transactions",
+      { params }
+    )
+    .then((r) => r.data);
 export const createTransaction = (data: Partial<Transaction>) =>
   api.post<Transaction>("/transactions", data).then((r) => r.data);
 export const updateTransaction = (id: string, data: Partial<Transaction>) =>
@@ -229,6 +234,8 @@ export const confirmImport = (
 // --- Transfers ---
 export const listTransfers = () => api.get<Transfer[]>("/transfers").then((r) => r.data);
 export const createTransfer = (data: Record<string, unknown>) => api.post<Transfer>("/transfers", data).then((r) => r.data);
+export const updateTransfer = (id: string, data: Record<string, unknown>) =>
+  api.put<Transfer>(`/transfers/${id}`, data).then((r) => r.data);
 export const deleteTransfer = (id: string) => api.delete(`/transfers/${id}`);
 
 // --- Summary ---

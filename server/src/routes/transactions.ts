@@ -37,13 +37,35 @@ transactionsRouter.get("/", async (req, res) => {
     prisma.transaction.findMany({
       where,
       include: { category: true, group: true, account: true },
-      orderBy: { date: "desc" },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
   ]);
 
-  res.json({ total, page, pageSize, transactions });
+  // A running balance is only well-defined when scoped to a single group
+  // (mixing groups/accounts has no one coherent balance to run), and needs
+  // every one of that group's transactions - not just this page - to add up
+  // correctly, so it's computed from a separate, unpaginated query.
+  let runningBalances: Record<string, number> | undefined;
+  if (groupId) {
+    const group = await prisma.group.findUnique({ where: { id: groupId } });
+    if (group) {
+      const allInGroup = await prisma.transaction.findMany({
+        where: { groupId },
+        orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+        select: { id: true, amount: true },
+      });
+      runningBalances = {};
+      let running = group.openingBalance;
+      for (const t of allInGroup) {
+        running += t.amount;
+        runningBalances[t.id] = running;
+      }
+    }
+  }
+
+  res.json({ total, page, pageSize, transactions, runningBalances });
 });
 
 const createSchema = z.object({

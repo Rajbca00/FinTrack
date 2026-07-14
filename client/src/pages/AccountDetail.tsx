@@ -33,7 +33,11 @@ export function AccountDetail() {
   const account = accounts?.find((a) => a.id === id);
   const balance = balances?.find((b) => b.id === id);
 
-  const { data: txnData, isLoading } = useTransactions({ accountId: id, groupId: activeGroupId, pageSize: 100 });
+  // A running balance needs a single group to be well-defined - when the
+  // account only has one, there's nothing to pick, so use it automatically
+  // rather than requiring the (nonexistent) filter chips to select it.
+  const effectiveGroupId = activeGroupId ?? (account?.groups.length === 1 ? account.groups[0].id : undefined);
+  const { data: txnData, isLoading } = useTransactions({ accountId: id, groupId: effectiveGroupId, pageSize: 100 });
 
   if (!account) return <p className="text-sm text-slate-500">Loading account…</p>;
 
@@ -111,7 +115,13 @@ export function AccountDetail() {
         <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Transactions</h2>
         {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
         {!isLoading && txnData && (
-          <TransactionTable transactions={txnData.transactions} categories={categories ?? []} groups={account.groups} />
+          <TransactionTable
+            transactions={txnData.transactions}
+            categories={categories ?? []}
+            groups={account.groups}
+            runningBalances={txnData.runningBalances}
+            currency={account.currency}
+          />
         )}
       </div>
 

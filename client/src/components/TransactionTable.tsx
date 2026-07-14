@@ -18,11 +18,17 @@ export function TransactionTable({
   categories,
   groups,
   showAccountColumn,
+  runningBalances,
+  currency,
 }: {
   transactions: Transaction[];
   categories: Category[];
   groups?: Group[];
   showAccountColumn?: boolean;
+  // Only meaningful (and only passed by callers) when the list is scoped to
+  // a single group - see the server's /transactions handler for why.
+  runningBalances?: Record<string, number>;
+  currency?: string;
 }) {
   const updateTransaction = useUpdateTransaction();
   const deleteTransaction = useDeleteTransaction();
@@ -99,6 +105,7 @@ export function TransactionTable({
               <th className="px-4 py-2 font-medium">Category</th>
               <th className="px-4 py-2 font-medium">Notes</th>
               <th className="px-4 py-2 text-right font-medium">Amount</th>
+              {runningBalances && <th className="px-4 py-2 text-right font-medium">Balance</th>}
               <th className="px-4 py-2 font-medium" />
             </tr>
           </thead>
@@ -163,8 +170,13 @@ export function TransactionTable({
                   t.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-slate-700 dark:text-slate-200"
                 }`}
               >
-                {formatMoney(t.amount)}
+                {formatMoney(t.amount, currency)}
               </td>
+              {runningBalances && (
+                <td className="whitespace-nowrap px-4 py-2 text-right text-slate-600 dark:text-slate-300">
+                  {runningBalances[t.id] != null ? formatMoney(runningBalances[t.id], currency) : "—"}
+                </td>
+              )}
               <td className="whitespace-nowrap px-4 py-2 text-right">
                 <Button variant="ghost" onClick={() => setEditing(t)}>
                   Edit

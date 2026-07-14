@@ -113,7 +113,14 @@ export function Transactions() {
       {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
       {data && (
         <>
-          <TransactionTable transactions={data.transactions} categories={categories ?? []} groups={allGroups} showAccountColumn />
+          <TransactionTable
+            transactions={data.transactions}
+            categories={categories ?? []}
+            groups={allGroups}
+            showAccountColumn
+            runningBalances={data.runningBalances}
+            currency={selectedAccount?.currency}
+          />
           <div className="flex items-center justify-between text-sm text-slate-500">
             <span>
               {data.total} transaction(s) · page {page} of {totalPages}

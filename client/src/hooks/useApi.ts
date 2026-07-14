@@ -201,6 +201,19 @@ export function useCreateTransfer() {
   });
 }
 
+export function useUpdateTransfer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) => api.updateTransfer(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transfers"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["balances"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+    },
+  });
+}
+
 export function useDeleteTransfer() {
   const qc = useQueryClient();
   return useMutation({

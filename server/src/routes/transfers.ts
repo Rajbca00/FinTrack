@@ -141,6 +141,96 @@ transfersRouter.post("/", async (req, res) => {
   res.status(201).json(transfer);
 });
 
+transfersRouter.put("/:id", async (req, res) => {
+  const parsed = transferSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const data = parsed.data;
+  const date = new Date(data.date);
+
+  const existing = await prisma.transfer.findUnique({
+    where: { id: req.params.id },
+    include: { transactions: true },
+  });
+  if (!existing) return res.status(404).json({ error: "Transfer not found" });
+  if (existing.type !== data.type) {
+    return res.status(400).json({ error: "Cannot change a transfer's type - delete and recreate it instead" });
+  }
+
+  const fromLeg = existing.transactions.find((t) => t.amount < 0);
+  const toLeg = existing.transactions.find((t) => t.amount > 0);
+  if (!fromLeg || !toLeg) return res.status(400).json({ error: "Transfer is missing a leg" });
+
+  if (data.type === "ACCOUNT_TRANSFER") {
+    if (data.fromAccountId === data.toAccountId && data.fromGroupId === data.toGroupId) {
+      return res.status(400).json({ error: "Source and destination must differ" });
+    }
+    await prisma.$transaction([
+      prisma.transaction.update({
+        where: { id: fromLeg.id },
+        data: {
+          accountId: data.fromAccountId,
+          groupId: data.fromGroupId,
+          date,
+          amount: -data.amount,
+          description: data.note ? `Transfer out: ${data.note}` : "Transfer out",
+        },
+      }),
+      prisma.transaction.update({
+        where: { id: toLeg.id },
+        data: {
+          accountId: data.toAccountId,
+          groupId: data.toGroupId,
+          date,
+          amount: data.amount,
+          description: data.note ? `Transfer in: ${data.note}` : "Transfer in",
+        },
+      }),
+      prisma.transfer.update({ where: { id: req.params.id }, data: { date, amount: data.amount, note: data.note } }),
+    ]);
+  } else {
+    // GROUP_REALLOCATION
+    if (data.fromGroupId === data.toGroupId) {
+      return res.status(400).json({ error: "Source and destination groups must differ" });
+    }
+    const [fromGroup, toGroup] = await Promise.all([
+      prisma.group.findUnique({ where: { id: data.fromGroupId } }),
+      prisma.group.findUnique({ where: { id: data.toGroupId } }),
+    ]);
+    if (!fromGroup || !toGroup || fromGroup.accountId !== data.accountId || toGroup.accountId !== data.accountId) {
+      return res.status(400).json({ error: "Both groups must belong to the given account" });
+    }
+    await prisma.$transaction([
+      prisma.transaction.update({
+        where: { id: fromLeg.id },
+        data: {
+          accountId: data.accountId,
+          groupId: data.fromGroupId,
+          date,
+          amount: -data.amount,
+          description: data.note ? `Reallocation out: ${data.note}` : `Reallocated to ${toGroup.name}`,
+        },
+      }),
+      prisma.transaction.update({
+        where: { id: toLeg.id },
+        data: {
+          accountId: data.accountId,
+          groupId: data.toGroupId,
+          date,
+          amount: data.amount,
+          description: data.note ? `Reallocation in: ${data.note}` : `Reallocated from ${fromGroup.name}`,
+        },
+      }),
+      prisma.transfer.update({ where: { id: req.params.id }, data: { date, amount: data.amount, note: data.note } }),
+    ]);
+  }
+
+  const transfer = await prisma.transfer.findUnique({
+    where: { id: req.params.id },
+    include: { transactions: { include: { account: true, group: true } } },
+  });
+  res.json(transfer);
+});
+
 transfersRouter.delete("/:id", async (req, res) => {
   await prisma.transaction.deleteMany({ where: { transferId: req.params.id } });
   await prisma.transfer.delete({ where: { id: req.params.id } });
