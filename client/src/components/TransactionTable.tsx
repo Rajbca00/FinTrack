@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import type { Category, Group, Transaction } from "../lib/api";
-import { assignableCategories } from "../lib/api";
+import { assignableCategories, getErrorMessage } from "../lib/api";
 import {
+  useAccounts,
   useDeleteTransaction,
   useUpdateTransaction,
+  useCreateTransfer,
   useBulkCategorize,
   useBulkMoveGroup,
   useBulkDeleteTransactions,
@@ -270,11 +272,28 @@ function EditTransactionModal({
   onClose: () => void;
   onSave: (patch: Partial<Transaction>) => void;
 }) {
+  const { data: accounts } = useAccounts();
+  const createTransfer = useCreateTransfer();
+  const deleteTransaction = useDeleteTransaction();
+
   const [date, setDate] = useState(toDateInputValue(transaction.date));
   const [description, setDescription] = useState(transaction.description);
   const [amount, setAmount] = useState(String(transaction.amount));
   const [categoryId, setCategoryId] = useState(transaction.categoryId ?? "");
   const [notes, setNotes] = useState(transaction.notes ?? "");
+  const [transferToAccountId, setTransferToAccountId] = useState("");
+  const [transferToGroupId, setTransferToGroupId] = useState("");
+
+  // Only a plain transaction can be converted - one that's already a transfer
+  // leg has a paired counterpart that this flow doesn't know how to update,
+  // so editing/deleting that pair stays on the Transfers page.
+  const convertingToTransfer =
+    !transaction.isTransfer && categories.find((c) => c.id === categoryId)?.type === "TRANSFER";
+  const transferToAccount = accounts?.find((a) => a.id === transferToAccountId);
+  const sameAccountAndGroup =
+    transferToAccountId === transaction.accountId && transferToGroupId === transaction.groupId;
+
+  const saving = createTransfer.isPending || deleteTransaction.isPending;
 
   return (
     <Modal title="Edit transaction" onClose={onClose}>
@@ -302,24 +321,85 @@ function EditTransactionModal({
             ))}
           </Select>
         </div>
+        {convertingToTransfer && (
+          <>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              This will delete this transaction and record it as a transfer instead, with the account/group above as
+              one leg.
+            </p>
+            <div>
+              <Label>Transfer to account</Label>
+              <Select
+                value={transferToAccountId}
+                onChange={(e) => {
+                  setTransferToAccountId(e.target.value);
+                  const acc = accounts?.find((a) => a.id === e.target.value);
+                  setTransferToGroupId(acc?.groups.find((g) => g.isDefault)?.id ?? acc?.groups[0]?.id ?? "");
+                }}
+              >
+                <option value="">Select account…</option>
+                {accounts?.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            {transferToAccount && transferToAccount.groups.length > 1 && (
+              <div>
+                <Label>Transfer to group</Label>
+                <Select value={transferToGroupId} onChange={(e) => setTransferToGroupId(e.target.value)}>
+                  {transferToAccount.groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+            {sameAccountAndGroup && <p className="text-xs text-red-500">Source and destination must be different.</p>}
+          </>
+        )}
         <div>
           <Label>Notes</Label>
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" />
         </div>
         <Button
           className="mt-2"
-          onClick={() =>
-            onSave({
-              date: new Date(date).toISOString(),
-              description,
-              amount: transaction.isTransfer ? undefined : Number(amount),
-              categoryId: categoryId || null,
-              notes: notes || null,
-            })
-          }
+          disabled={saving || (convertingToTransfer && (!transferToAccountId || !transferToGroupId || sameAccountAndGroup))}
+          onClick={() => {
+            if (convertingToTransfer) {
+              const legAmount = Math.abs(Number(amount));
+              const outgoing = Number(amount) < 0;
+              createTransfer.mutate(
+                {
+                  type: "ACCOUNT_TRANSFER",
+                  date: new Date(date).toISOString(),
+                  amount: legAmount,
+                  note: description.trim() || undefined,
+                  fromAccountId: outgoing ? transaction.accountId : transferToAccountId,
+                  fromGroupId: outgoing ? transaction.groupId : transferToGroupId,
+                  toAccountId: outgoing ? transferToAccountId : transaction.accountId,
+                  toGroupId: outgoing ? transferToGroupId : transaction.groupId,
+                },
+                { onSuccess: () => deleteTransaction.mutate(transaction.id, { onSuccess: onClose }) }
+              );
+            } else {
+              onSave({
+                date: new Date(date).toISOString(),
+                description,
+                amount: transaction.isTransfer ? undefined : Number(amount),
+                categoryId: categoryId || null,
+                notes: notes || null,
+              });
+            }
+          }}
         >
-          Save changes
+          {saving ? "Saving…" : convertingToTransfer ? "Convert to transfer" : "Save changes"}
         </Button>
+        {(createTransfer.isError || deleteTransaction.isError) && (
+          <p className="text-xs text-red-500">{getErrorMessage(createTransfer.error ?? deleteTransaction.error)}</p>
+        )}
       </div>
     </Modal>
   );
