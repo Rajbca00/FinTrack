@@ -21,10 +21,13 @@ transactionsRouter.get("/", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const { accountId, groupId, categoryId, from, to, q, page, pageSize } = parsed.data;
 
+  // "uncategorized" is a client-side sentinel for categoryId: null (the
+  // real "no category" state - see categorize()'s null return), not an
+  // actual category id, since ids are cuids and never collide with it.
   const where = {
     accountId,
     groupId,
-    categoryId,
+    categoryId: categoryId === "uncategorized" ? null : categoryId,
     date: from || to ? { gte: from ? new Date(from) : undefined, lte: to ? new Date(to) : undefined } : undefined,
     description: q ? { contains: q } : undefined,
   };

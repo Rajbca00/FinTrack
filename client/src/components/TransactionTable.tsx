@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Category, Group, Transaction } from "../lib/api";
+import { assignableCategories } from "../lib/api";
 import {
   useDeleteTransaction,
   useUpdateTransaction,
@@ -143,7 +144,7 @@ export function TransactionTable({
                   className="min-w-[10rem]"
                 >
                   <option value="">Uncategorized</option>
-                  {categories.map((c) => (
+                  {assignableCategories(categories).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>
@@ -226,7 +227,7 @@ function BulkActionsBar({
         }}
       >
         <option value="">Categorize as…</option>
-        {categories.map((c) => (
+        {assignableCategories(categories).map((c) => (
           <option key={c.id} value={c.id}>
             {c.name}
           </option>
@@ -294,7 +295,7 @@ function EditTransactionModal({
           <Label>Category</Label>
           <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
             <option value="">Uncategorized</option>
-            {categories.map((c) => (
+            {assignableCategories(categories).map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>

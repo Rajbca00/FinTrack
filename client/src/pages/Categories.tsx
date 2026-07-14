@@ -11,6 +11,7 @@ import {
   useApplyRules,
 } from "../hooks/useApi";
 import { Card, Button, Modal, Input, Select, Label, Badge } from "../components/ui";
+import { assignableCategories } from "../lib/api";
 import type { AmountSign, Category, CategoryRule, CategoryType, MatchType } from "../lib/api";
 
 export function Categories() {
@@ -204,7 +205,7 @@ function AddRuleModal({ onClose }: { onClose: () => void }) {
           <Label>Category</Label>
           <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
             <option value="">Select category…</option>
-            {categories?.map((c) => (
+            {assignableCategories(categories).map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -320,7 +321,7 @@ function EditRuleModal({ rule, onClose }: { rule: CategoryRule; onClose: () => v
         <div>
           <Label>Category</Label>
           <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            {categories?.map((c) => (
+            {assignableCategories(categories).map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>

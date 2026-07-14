@@ -42,6 +42,16 @@ export type Category = {
   _count?: { transactions: number; rules: number };
 };
 
+// The seeded system "Uncategorized" category is never actually assigned to a
+// transaction - rule matching and the "no category" state both use
+// categoryId: null (see server/src/services/rulesEngine.ts and
+// summary.ts's `t.category?.name ?? "Uncategorized"` fallback). Listing it
+// in an assignment picker just creates a second, non-functional
+// "Uncategorized" entry next to the real null-based one, so every picker
+// that assigns a category to something filters it out with this helper.
+export const assignableCategories = (categories: Category[] | undefined) =>
+  categories?.filter((c) => c.name !== "Uncategorized") ?? [];
+
 export type CategoryRule = {
   id: string;
   pattern: string;

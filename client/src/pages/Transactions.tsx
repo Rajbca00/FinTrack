@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useAccounts, useCategories, useTransactions, useCreateTransaction, useCreateTransfer, useApplyRules } from "../hooks/useApi";
 import { TransactionTable } from "../components/TransactionTable";
 import { Card, Button, Select, Input, Label, Modal } from "../components/ui";
+import { assignableCategories } from "../lib/api";
 
 export function Transactions() {
   const { data: accounts } = useAccounts();
@@ -86,7 +87,8 @@ export function Transactions() {
           <Label>Category</Label>
           <Select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setPage(1); }}>
             <option value="">All categories</option>
-            {categories?.map((c) => (
+            <option value="uncategorized">Uncategorized</option>
+            {assignableCategories(categories).map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -209,7 +211,7 @@ function AddTransactionModal({ onClose }: { onClose: () => void }) {
             }}
           >
             <option value="">Auto-detect</option>
-            {categories?.map((c) => (
+            {assignableCategories(categories).map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
