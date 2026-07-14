@@ -69,16 +69,20 @@ export function Dashboard() {
     ...monthRange,
   });
 
-  const [categoryTrendMonths, setCategoryTrendMonths] = useState(6);
-  // Always spans multiple months regardless of the Period/Month pickers
-  // above (those narrow everything else to one window) - "month on month"
-  // only means something as its own longer, independent range.
+  // Runs independently of the Period/Month pickers above (those narrow
+  // everything else to one window) - "month on month" only means something
+  // as its own range. "current"/"last" are single-month windows; the rest
+  // are trailing windows ending at the current month.
+  const [categoryTrendPreset, setCategoryTrendPreset] = useState<"current" | "last" | "3" | "6" | "12">("6");
   const categoryTrendRange = useMemo(() => {
     const now = new Date();
-    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (categoryTrendMonths - 1), 1)).toISOString();
-    const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999)).toISOString();
+    const endMonthOffset = categoryTrendPreset === "last" ? -1 : 0;
+    const startMonthOffset =
+      categoryTrendPreset === "current" || categoryTrendPreset === "last" ? endMonthOffset : endMonthOffset - (Number(categoryTrendPreset) - 1);
+    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + startMonthOffset, 1)).toISOString();
+    const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + endMonthOffset + 1, 0, 23, 59, 59, 999)).toISOString();
     return { from, to };
-  }, [categoryTrendMonths]);
+  }, [categoryTrendPreset]);
   const { data: categoryTrend } = useCategoryTrend({
     type: "EXPENSE",
     accountId: accountId || undefined,
@@ -246,9 +250,11 @@ export function Dashboard() {
           <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Category spend by month</h2>
           <Select
             className="w-auto"
-            value={String(categoryTrendMonths)}
-            onChange={(e) => setCategoryTrendMonths(Number(e.target.value))}
+            value={categoryTrendPreset}
+            onChange={(e) => setCategoryTrendPreset(e.target.value as typeof categoryTrendPreset)}
           >
+            <option value="current">Current month</option>
+            <option value="last">Last month</option>
             <option value="3">Last 3 months</option>
             <option value="6">Last 6 months</option>
             <option value="12">Last 12 months</option>
