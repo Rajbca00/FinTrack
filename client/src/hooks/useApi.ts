@@ -230,14 +230,32 @@ export function useBalances() {
   return useQuery({ queryKey: ["balances"], queryFn: api.getBalances });
 }
 
-export function useTrend(params: { period: "week" | "month" | "year"; from?: string; to?: string; accountId?: string; groupId?: string }) {
+export function useTrend(params: {
+  period: "week" | "month" | "year";
+  from?: string;
+  to?: string;
+  accountId?: string;
+  groupId?: string | string[];
+}) {
   return useQuery({ queryKey: ["trend", params], queryFn: () => api.getTrend(params) });
 }
 
-export function useBreakdown(params: { from?: string; to?: string; accountId?: string; groupId?: string; type: "INCOME" | "EXPENSE" }) {
+export function useBreakdown(params: {
+  from?: string;
+  to?: string;
+  accountId?: string;
+  groupId?: string | string[];
+  type: "INCOME" | "EXPENSE";
+}) {
   return useQuery({ queryKey: ["breakdown", params], queryFn: () => api.getBreakdown(params) });
 }
 
-export function useCategoryTrend(params: { from?: string; to?: string; accountId?: string; groupId?: string; type: "INCOME" | "EXPENSE" }) {
+export function useCategoryTrend(params: {
+  from?: string;
+  to?: string;
+  accountId?: string;
+  groupId?: string | string[];
+  type: "INCOME" | "EXPENSE";
+}) {
   return useQuery({ queryKey: ["categoryTrend", params], queryFn: () => api.getCategoryTrend(params) });
 }

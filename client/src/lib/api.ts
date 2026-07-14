@@ -240,14 +240,22 @@ export const updateTransfer = (id: string, data: Record<string, unknown>) =>
 export const deleteTransfer = (id: string) => api.delete(`/transfers/${id}`);
 
 // --- Summary ---
-export const getTrend = (params: { period: "week" | "month" | "year"; from?: string; to?: string; accountId?: string; groupId?: string }) =>
-  api.get<TrendPoint[]>("/summary/trend", { params }).then((r) => r.data);
+// groupId accepts an array to filter by every group matching a name across
+// accounts (e.g. all "General" groups) - axios serializes it as repeated
+// query keys, which Express parses back into an array.
+export const getTrend = (params: {
+  period: "week" | "month" | "year";
+  from?: string;
+  to?: string;
+  accountId?: string;
+  groupId?: string | string[];
+}) => api.get<TrendPoint[]>("/summary/trend", { params }).then((r) => r.data);
 export const getBreakdown = (params: {
   period?: "week" | "month" | "year";
   from?: string;
   to?: string;
   accountId?: string;
-  groupId?: string;
+  groupId?: string | string[];
   type: "INCOME" | "EXPENSE";
 }) => api.get<BreakdownPoint[]>("/summary/breakdown", { params }).then((r) => r.data);
 export const getBalances = () => api.get<AccountBalance[]>("/summary/balances").then((r) => r.data);
@@ -258,7 +266,7 @@ export const getCategoryTrend = (params: {
   from?: string;
   to?: string;
   accountId?: string;
-  groupId?: string;
+  groupId?: string | string[];
   type: "INCOME" | "EXPENSE";
 }) =>
   api

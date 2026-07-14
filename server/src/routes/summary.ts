@@ -9,7 +9,10 @@ const filterSchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
   accountId: z.string().optional(),
-  groupId: z.string().optional(),
+  // Array form filters by every group matching a set of ids at once - used
+  // by the Dashboard's group-name filter to span every account sharing a
+  // group name (e.g. "General"), since a name isn't one id.
+  groupId: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
 summaryRouter.get("/trend", async (req, res) => {

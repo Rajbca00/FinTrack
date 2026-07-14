@@ -27,12 +27,30 @@ export function Dashboard() {
   const { data: balances } = useBalances();
   const [period, setPeriod] = useState<Period>("month");
   const [accountId, setAccountId] = useState("");
-  const [groupId, setGroupId] = useState("");
+  // Filters the report sections (trend/breakdown/category-trend) below by
+  // group *name* rather than a single group id, since a name like "General"
+  // exists once per account - defaults to "General" so a Temple Fund-style
+  // secondary group doesn't silently skew the main financial reports.
+  const [groupName, setGroupName] = useState("General");
   // Only meaningful when period === "month" - lets the charts narrow down to
   // one specific month instead of showing the whole transaction history.
   const [selectedMonth, setSelectedMonth] = useState("");
 
-  const selectedAccount = accounts?.find((a) => a.id === accountId);
+  const groupNames = useMemo(() => {
+    const names = new Set<string>();
+    accounts?.forEach((a) => a.groups.forEach((g) => names.add(g.name)));
+    return Array.from(names).sort();
+  }, [accounts]);
+
+  // The report queries take an array of ids (every group across accounts
+  // sharing this name), narrowed further to just the selected account's
+  // matching group if one is chosen. Undefined ("All groups") applies no
+  // group filter at all.
+  const reportGroupIds = useMemo(() => {
+    if (!groupName) return undefined;
+    const scope = accountId ? accounts?.filter((a) => a.id === accountId) : accounts;
+    return scope?.flatMap((a) => a.groups.filter((g) => g.name === groupName).map((g) => g.id));
+  }, [groupName, accountId, accounts]);
 
   // Last 24 months, newest first, as "yyyy-MM" values - matches the format
   // produced by the monthly trend bucket keys in server/src/services/summary.ts.
@@ -59,13 +77,13 @@ export function Dashboard() {
   const { data: trend } = useTrend({
     period,
     accountId: accountId || undefined,
-    groupId: groupId || undefined,
+    groupId: reportGroupIds,
     ...monthRange,
   });
   const { data: breakdown } = useBreakdown({
     type: "EXPENSE",
     accountId: accountId || undefined,
-    groupId: groupId || undefined,
+    groupId: reportGroupIds,
     ...monthRange,
   });
 
@@ -86,7 +104,7 @@ export function Dashboard() {
   const { data: categoryTrend } = useCategoryTrend({
     type: "EXPENSE",
     accountId: accountId || undefined,
-    groupId: groupId || undefined,
+    groupId: reportGroupIds,
     ...categoryTrendRange,
   });
 
@@ -172,13 +190,7 @@ export function Dashboard() {
         )}
         <div className="w-56">
           <Label>Account</Label>
-          <Select
-            value={accountId}
-            onChange={(e) => {
-              setAccountId(e.target.value);
-              setGroupId("");
-            }}
-          >
+          <Select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
             <option value="">All accounts</option>
             {accounts?.map((a) => (
               <option key={a.id} value={a.id}>
@@ -187,19 +199,17 @@ export function Dashboard() {
             ))}
           </Select>
         </div>
-        {selectedAccount && selectedAccount.groups.length > 1 && (
-          <div className="w-56">
-            <Label>Group</Label>
-            <Select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-              <option value="">All groups</option>
-              {selectedAccount.groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-        )}
+        <div className="w-56">
+          <Label>Group</Label>
+          <Select value={groupName} onChange={(e) => setGroupName(e.target.value)}>
+            <option value="">All groups</option>
+            {groupNames.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </Select>
+        </div>
       </Card>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

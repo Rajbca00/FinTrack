@@ -8,7 +8,9 @@ export type TrendFilters = {
   from?: Date;
   to?: Date;
   accountId?: string;
-  groupId?: string;
+  // Array form is used to filter by group *name* across accounts (e.g. every
+  // "General" group across every account) - see /summary routes.
+  groupId?: string | string[];
 };
 
 function bucketKey(date: Date, period: Period): { key: string; label: string } {
@@ -24,7 +26,7 @@ function bucketKey(date: Date, period: Period): { key: string; label: string } {
   return { key: format(start, "yyyy-MM"), label: format(start, "MMM yyyy") };
 }
 
-async function fetchTransactions(filters: { from?: Date; to?: Date; accountId?: string; groupId?: string }) {
+async function fetchTransactions(filters: { from?: Date; to?: Date; accountId?: string; groupId?: string | string[] }) {
   return prisma.transaction.findMany({
     where: {
       date: {
@@ -32,7 +34,7 @@ async function fetchTransactions(filters: { from?: Date; to?: Date; accountId?: 
         lte: filters.to,
       },
       accountId: filters.accountId,
-      groupId: filters.groupId,
+      groupId: Array.isArray(filters.groupId) ? { in: filters.groupId } : filters.groupId,
     },
     include: { category: true },
     orderBy: { date: "asc" },
@@ -61,7 +63,7 @@ export async function getTrend(filters: TrendFilters) {
     .map((b) => ({ ...b, net: b.income - b.expense }));
 }
 
-export async function getCategoryBreakdown(filters: { from?: Date; to?: Date; accountId?: string; groupId?: string; type?: "INCOME" | "EXPENSE" }) {
+export async function getCategoryBreakdown(filters: { from?: Date; to?: Date; accountId?: string; groupId?: string | string[]; type?: "INCOME" | "EXPENSE" }) {
   const txns = await fetchTransactions(filters);
   const wantType = filters.type ?? "EXPENSE";
   const totals = new Map<string, { categoryId: string; name: string; color: string | null; total: number }>();
@@ -84,7 +86,7 @@ export async function getCategoryMonthlyBreakdown(filters: {
   from?: Date;
   to?: Date;
   accountId?: string;
-  groupId?: string;
+  groupId?: string | string[];
   type?: "INCOME" | "EXPENSE";
 }) {
   const txns = await fetchTransactions(filters);
