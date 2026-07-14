@@ -2,7 +2,7 @@
   "installCommand": "npm install && npm install --prefix client && npm install --prefix server && npm run migrate:deploy --prefix server",
   "builds": [
     { "src": "api/index.ts", "use": "@vercel/node" },
-    { "src": "client/package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }
+    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "client/dist" } }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index.ts" },
