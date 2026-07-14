@@ -70,6 +70,35 @@ export function Dashboard() {
   });
 
   const totalBalance = useMemo(() => (balances ?? []).reduce((sum, a) => sum + a.balance, 0), [balances]);
+
+  // Groups are scoped to a single account in the data model (no cross-account
+  // group exists), so this rolls up same-named groups across accounts for
+  // display purposes only - e.g. a "Temple Fund" group in two different bank
+  // accounts shows here as one combined total, without changing how either
+  // group is actually stored or edited.
+  const fundsAcrossAccounts = useMemo(() => {
+    if (!balances) return [];
+    const byName = new Map<
+      string,
+      { name: string; color: string | null; total: number; accounts: { name: string; balance: number; currency: string }[] }
+    >();
+    for (const acc of balances) {
+      for (const g of acc.groups) {
+        const entry = byName.get(g.name) ?? { name: g.name, color: g.color, total: 0, accounts: [] };
+        entry.total += g.balance;
+        entry.accounts.push({ name: acc.name, balance: g.balance, currency: acc.currency });
+        byName.set(g.name, entry);
+      }
+    }
+    return Array.from(byName.values())
+      .filter((f) => f.accounts.length > 1)
+      .map((f) => ({
+        ...f,
+        // Summing across currencies would be meaningless, so only show a
+        // combined total when every contributing account shares one.
+        currency: f.accounts.every((a) => a.currency === f.accounts[0].currency) ? f.accounts[0].currency : null,
+      }));
+  }, [balances]);
   const currentPeriod = trend?.[trend.length - 1];
   const income = currentPeriod?.income ?? 0;
   const expense = currentPeriod?.expense ?? 0;
@@ -194,6 +223,37 @@ export function Dashboard() {
         </ResponsiveContainer>
         {breakdownWithOther.length === 0 && <p className="py-6 text-center text-sm text-slate-500">No expenses in range yet.</p>}
       </Card>
+
+      {fundsAcrossAccounts.length > 0 && (
+        <div>
+          <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Funds across accounts</h2>
+          <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+            Groups that share a name in more than one account, combined here for reference. Each is still a separate
+            group with its own balance - use Transfers → Reallocate to move money between them within an account.
+          </p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {fundsAcrossAccounts.map((f) => (
+              <Card key={f.name}>
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full" style={{ background: f.color ?? "#94a3b8" }} />
+                  <p className="font-medium text-slate-900 dark:text-white">{f.name}</p>
+                </div>
+                <p className="text-xl font-semibold text-slate-900 dark:text-white">
+                  {f.currency ? formatMoney(f.total, f.currency) : "Mixed currencies"}
+                </p>
+                <ul className="mt-2 flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
+                  {f.accounts.map((a) => (
+                    <li key={a.name} className="flex items-center justify-between">
+                      <span>{a.name}</span>
+                      <span>{formatMoney(a.balance, a.currency)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Balances by account & group</h2>
