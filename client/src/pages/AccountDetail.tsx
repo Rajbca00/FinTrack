@@ -26,6 +26,7 @@ export function AccountDetail() {
   const [showAddGroup, setShowAddGroup] = useState(false);
   const [showEditAccount, setShowEditAccount] = useState(false);
   const [showAddTransaction, setShowAddTransaction] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<Account["groups"][number] | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<string | undefined>(undefined);
   const createGroup = useCreateGroup();
   const deleteGroup = useDeleteGroup();
@@ -84,16 +85,21 @@ export function AccountDetail() {
             <Card key={g.id} className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <Badge color={g.color}>{g.name}</Badge>
-                {!g.isDefault && (
-                  <button
-                    className="text-xs text-slate-400 hover:text-red-500"
-                    onClick={() => {
-                      if (confirm(`Delete group "${g.name}"? It must have no transactions.`)) deleteGroup.mutate(g.id);
-                    }}
-                  >
-                    Remove
+                <div className="flex items-center gap-2">
+                  <button className="text-xs text-slate-400 hover:text-blue-500" onClick={() => setEditingGroup(g)}>
+                    Edit
                   </button>
-                )}
+                  {!g.isDefault && (
+                    <button
+                      className="text-xs text-slate-400 hover:text-red-500"
+                      onClick={() => {
+                        if (confirm(`Delete group "${g.name}"? It must have no transactions.`)) deleteGroup.mutate(g.id);
+                      }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
               </div>
               <p className="text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(gb?.balance ?? 0, account.currency)}</p>
               <p className="text-xs text-slate-500">{gb?.transactionCount ?? 0} transactions</p>
@@ -136,21 +142,19 @@ export function AccountDetail() {
       {showAddTransaction && (
         <AddTransactionModal defaultAccountId={account.id} onClose={() => setShowAddTransaction(false)} />
       )}
+      {editingGroup && <EditGroupModal group={editingGroup} onClose={() => setEditingGroup(null)} />}
     </div>
   );
 }
 
 function EditAccountModal({ account, onClose }: { account: Account; onClose: () => void }) {
   const updateAccount = useUpdateAccount();
-  const updateGroup = useUpdateGroup();
-  const defaultGroup = account.groups.find((g) => g.isDefault);
 
   const [name, setName] = useState(account.name);
   const [institution, setInstitution] = useState(account.institution ?? "");
   const [last4, setLast4] = useState(account.last4 ?? "");
   const [currency, setCurrency] = useState(account.currency);
   const [creditLimit, setCreditLimit] = useState(account.creditLimit != null ? String(account.creditLimit) : "");
-  const [openingBalance, setOpeningBalance] = useState(defaultGroup ? String(defaultGroup.openingBalance) : "0");
 
   return (
     <Modal title="Edit account" onClose={onClose}>
@@ -181,18 +185,9 @@ function EditAccountModal({ account, onClose }: { account: Account; onClose: () 
             </div>
           )}
         </div>
-        {defaultGroup && (
-          <div>
-            <Label>{account.isMultiPurpose ? `Initial balance (${defaultGroup.name})` : "Initial balance"}</Label>
-            <Input type="number" step="0.01" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} />
-            {account.isMultiPurpose && (
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                This account has multiple groups - this only changes the starting balance of "{defaultGroup.name}". Edit
-                other groups' balances separately.
-              </p>
-            )}
-          </div>
-        )}
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          To change a group's starting balance, name, or color, use "Edit" on that group's card instead.
+        </p>
         <Button
           className="mt-2"
           onClick={() => {
@@ -207,12 +202,53 @@ function EditAccountModal({ account, onClose }: { account: Account; onClose: () 
                 creditLimit: account.type === "CREDIT_CARD" ? Number(creditLimit) || null : null,
               },
             });
-            if (defaultGroup) {
-              const newBalance = Number(openingBalance) || 0;
-              if (newBalance !== defaultGroup.openingBalance) {
-                updateGroup.mutate({ id: defaultGroup.id, data: { openingBalance: newBalance } });
-              }
-            }
+            onClose();
+          }}
+        >
+          Save changes
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+function EditGroupModal({ group, onClose }: { group: Account["groups"][number]; onClose: () => void }) {
+  const updateGroup = useUpdateGroup();
+
+  const [name, setName] = useState(group.name);
+  const [color, setColor] = useState(group.color ?? "#94a3b8");
+  const [openingBalance, setOpeningBalance] = useState(String(group.openingBalance));
+
+  return (
+    <Modal title="Edit group" onClose={onClose}>
+      <div className="flex flex-col gap-3">
+        <div>
+          <Label>Name</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Color</Label>
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-700"
+            />
+          </div>
+          <div>
+            <Label>Starting balance</Label>
+            <Input type="number" step="0.01" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} />
+          </div>
+        </div>
+        <Button
+          className="mt-2"
+          disabled={!name.trim()}
+          onClick={() => {
+            updateGroup.mutate({
+              id: group.id,
+              data: { name: name.trim(), color, openingBalance: Number(openingBalance) || 0 },
+            });
             onClose();
           }}
         >
