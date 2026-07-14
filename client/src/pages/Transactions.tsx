@@ -11,6 +11,7 @@ export function Transactions() {
   const [accountId, setAccountId] = useState("");
   const [groupId, setGroupId] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [type, setType] = useState<"" | "INCOME" | "EXPENSE">("");
   const [q, setQ] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -24,6 +25,7 @@ export function Transactions() {
     accountId: accountId || undefined,
     groupId: groupId || undefined,
     categoryId: categoryId || undefined,
+    type: type || undefined,
     q: q || undefined,
     from: from || undefined,
     to: to || undefined,
@@ -54,7 +56,7 @@ export function Transactions() {
         </div>
       </div>
 
-      <Card className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <Card className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
         <div>
           <Label>Account</Label>
           <Select
@@ -94,6 +96,14 @@ export function Transactions() {
                 {c.name}
               </option>
             ))}
+          </Select>
+        </div>
+        <div>
+          <Label>Type</Label>
+          <Select value={type} onChange={(e) => { setType(e.target.value as typeof type); setPage(1); }}>
+            <option value="">Income & expense</option>
+            <option value="INCOME">Income only</option>
+            <option value="EXPENSE">Expense only</option>
           </Select>
         </div>
         <div>

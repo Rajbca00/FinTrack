@@ -172,6 +172,7 @@ export type TransactionListParams = {
   accountId?: string;
   groupId?: string;
   categoryId?: string;
+  type?: "INCOME" | "EXPENSE";
   from?: string;
   to?: string;
   q?: string;

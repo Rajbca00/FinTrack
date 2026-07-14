@@ -9,6 +9,7 @@ const listQuerySchema = z.object({
   accountId: z.string().optional(),
   groupId: z.string().optional(),
   categoryId: z.string().optional(),
+  type: z.enum(["INCOME", "EXPENSE"]).optional(),
   from: z.string().optional(),
   to: z.string().optional(),
   q: z.string().optional(),
@@ -19,15 +20,18 @@ const listQuerySchema = z.object({
 transactionsRouter.get("/", async (req, res) => {
   const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { accountId, groupId, categoryId, from, to, q, page, pageSize } = parsed.data;
+  const { accountId, groupId, categoryId, type, from, to, q, page, pageSize } = parsed.data;
 
   // "uncategorized" is a client-side sentinel for categoryId: null (the
   // real "no category" state - see categorize()'s null return), not an
   // actual category id, since ids are cuids and never collide with it.
+  // type=INCOME/EXPENSE filters by amount sign and excludes transfer legs,
+  // matching the "real income/expense" convention used in summary.ts.
   const where = {
     accountId,
     groupId,
     categoryId: categoryId === "uncategorized" ? null : categoryId,
+    ...(type ? { isTransfer: false, amount: type === "INCOME" ? { gte: 0 } : { lt: 0 } } : {}),
     date: from || to ? { gte: from ? new Date(from) : undefined, lte: to ? new Date(to) : undefined } : undefined,
     description: q ? { contains: q } : undefined,
   };
