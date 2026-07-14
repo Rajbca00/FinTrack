@@ -2,6 +2,29 @@ import axios from "axios";
 
 export const api = axios.create({ baseURL: "/api" });
 
+// Route handlers respond with either a plain string error (e.g. "Source and
+// destination must differ") or a zod .flatten() shape ({ formErrors,
+// fieldErrors }) on 400s. Mutations otherwise fail silently - React Query
+// just stores the error, nothing renders it - so every submit handler that
+// shows errors to the user should format them through this.
+export function getErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as { error?: unknown } | undefined;
+    const err = data?.error;
+    if (typeof err === "string") return err;
+    if (err && typeof err === "object") {
+      const flat = err as { formErrors?: string[]; fieldErrors?: Record<string, string[]> };
+      const messages = [
+        ...(flat.formErrors ?? []),
+        ...Object.entries(flat.fieldErrors ?? {}).flatMap(([field, msgs]) => (msgs ?? []).map((m) => `${field}: ${m}`)),
+      ];
+      if (messages.length > 0) return messages.join("; ");
+    }
+    return error.message;
+  }
+  return error instanceof Error ? error.message : "Something went wrong";
+}
+
 export type AccountType = "BANK" | "CREDIT_CARD";
 export type CategoryType = "INCOME" | "EXPENSE" | "TRANSFER";
 export type MatchType = "CONTAINS" | "STARTS_WITH" | "REGEX" | "EXACT";

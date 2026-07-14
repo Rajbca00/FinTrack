@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAccounts, useTransfers, useCreateTransfer, useDeleteTransfer } from "../hooks/useApi";
 import { Card, Button, Select, Input, Label } from "../components/ui";
 import { formatDate, formatMoney } from "../lib/format";
+import { getErrorMessage } from "../lib/api";
 import type { TransferType } from "../lib/api";
 
 export function Transfers() {
@@ -35,30 +36,39 @@ export function Transfers() {
       : reallocAccountId && reallocFromGroupId && reallocToGroupId && reallocFromGroupId !== reallocToGroupId);
 
   const submit = () => {
-    if (kind === "ACCOUNT_TRANSFER") {
-      createTransfer.mutate({
-        type: "ACCOUNT_TRANSFER",
-        date: new Date(date).toISOString(),
-        amount: Number(amount),
-        note: note || undefined,
-        fromAccountId,
-        fromGroupId,
-        toAccountId,
-        toGroupId,
-      });
-    } else {
-      createTransfer.mutate({
-        type: "GROUP_REALLOCATION",
-        date: new Date(date).toISOString(),
-        amount: Number(amount),
-        note: note || undefined,
-        accountId: reallocAccountId,
-        fromGroupId: reallocFromGroupId,
-        toGroupId: reallocToGroupId,
-      });
-    }
-    setAmount("");
-    setNote("");
+    // Amount is always a magnitude here - the two transfer legs get their
+    // signs assigned server-side - but the rest of the app teaches
+    // "negative = money out" (see Add transaction), so normalize instead of
+    // rejecting a negative value the user typed out of that habit.
+    const amountValue = Math.abs(Number(amount));
+    const payload =
+      kind === "ACCOUNT_TRANSFER"
+        ? {
+            type: "ACCOUNT_TRANSFER" as const,
+            date: new Date(date).toISOString(),
+            amount: amountValue,
+            note: note || undefined,
+            fromAccountId,
+            fromGroupId,
+            toAccountId,
+            toGroupId,
+          }
+        : {
+            type: "GROUP_REALLOCATION" as const,
+            date: new Date(date).toISOString(),
+            amount: amountValue,
+            note: note || undefined,
+            accountId: reallocAccountId,
+            fromGroupId: reallocFromGroupId,
+            toGroupId: reallocToGroupId,
+          };
+
+    createTransfer.mutate(payload, {
+      onSuccess: () => {
+        setAmount("");
+        setNote("");
+      },
+    });
   };
 
   return (
@@ -209,6 +219,7 @@ export function Transfers() {
         <Button className="self-start" disabled={!canSubmit || createTransfer.isPending} onClick={submit}>
           {createTransfer.isPending ? "Saving…" : "Record transfer"}
         </Button>
+        {createTransfer.isError && <p className="text-xs text-red-500">{getErrorMessage(createTransfer.error)}</p>}
       </Card>
 
       <div>

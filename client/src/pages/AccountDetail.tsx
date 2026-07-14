@@ -13,6 +13,7 @@ import {
 import { Card, Button, Modal, Input, Label, Badge } from "../components/ui";
 import { ImportWizard } from "../components/ImportWizard";
 import { TransactionTable } from "../components/TransactionTable";
+import { AddTransactionModal } from "../components/AddTransactionModal";
 import { formatMoney } from "../lib/format";
 import type { Account } from "../lib/api";
 
@@ -24,6 +25,7 @@ export function AccountDetail() {
   const [showImport, setShowImport] = useState(false);
   const [showAddGroup, setShowAddGroup] = useState(false);
   const [showEditAccount, setShowEditAccount] = useState(false);
+  const [showAddTransaction, setShowAddTransaction] = useState(false);
   const [activeGroupId, setActiveGroupId] = useState<string | undefined>(undefined);
   const createGroup = useCreateGroup();
   const deleteGroup = useDeleteGroup();
@@ -55,6 +57,9 @@ export function AccountDetail() {
           </Button>
           <Button variant="secondary" onClick={() => setShowAddGroup(true)}>
             + Add group
+          </Button>
+          <Button variant="secondary" onClick={() => setShowAddTransaction(true)}>
+            + Add transaction
           </Button>
           <Button onClick={() => setShowImport(true)}>Import statement</Button>
         </div>
@@ -118,6 +123,9 @@ export function AccountDetail() {
         />
       )}
       {showEditAccount && <EditAccountModal account={account} onClose={() => setShowEditAccount(false)} />}
+      {showAddTransaction && (
+        <AddTransactionModal defaultAccountId={account.id} onClose={() => setShowAddTransaction(false)} />
+      )}
     </div>
   );
 }
