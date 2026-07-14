@@ -80,6 +80,52 @@ export async function getCategoryBreakdown(filters: { from?: Date; to?: Date; ac
   return Array.from(totals.values()).sort((a, b) => b.total - a.total);
 }
 
+export async function getCategoryMonthlyBreakdown(filters: {
+  from?: Date;
+  to?: Date;
+  accountId?: string;
+  groupId?: string;
+  type?: "INCOME" | "EXPENSE";
+}) {
+  const txns = await fetchTransactions(filters);
+  const wantType = filters.type ?? "EXPENSE";
+
+  const monthLabels = new Map<string, string>();
+  const categories = new Map<string, { categoryId: string; name: string; color: string | null; totals: Map<string, number> }>();
+
+  for (const t of txns) {
+    if (!isRealIncomeExpense(t.category?.type, t.isTransfer)) continue;
+    const sign = t.amount >= 0 ? "INCOME" : "EXPENSE";
+    if (sign !== wantType) continue;
+
+    const { key: monthKey, label: monthLabel } = bucketKey(t.date, "month");
+    monthLabels.set(monthKey, monthLabel);
+
+    const categoryId = t.categoryId ?? "uncategorized";
+    const name = t.category?.name ?? "Uncategorized";
+    const color = t.category?.color ?? "#64748b";
+    if (!categories.has(categoryId)) categories.set(categoryId, { categoryId, name, color, totals: new Map() });
+    const entry = categories.get(categoryId)!;
+    entry.totals.set(monthKey, (entry.totals.get(monthKey) ?? 0) + Math.abs(t.amount));
+  }
+
+  const months = Array.from(monthLabels.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, label]) => ({ key, label }));
+
+  const rows = Array.from(categories.values())
+    .map((c) => ({
+      categoryId: c.categoryId,
+      name: c.name,
+      color: c.color,
+      totals: months.map((m) => c.totals.get(m.key) ?? 0),
+      total: Array.from(c.totals.values()).reduce((s, v) => s + v, 0),
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  return { months, rows };
+}
+
 export async function getBalances() {
   const accounts = await prisma.account.findMany({
     where: { archived: false },

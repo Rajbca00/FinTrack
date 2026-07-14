@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useAccounts, useBalances, useBreakdown, useTrend } from "../hooks/useApi";
+import { useAccounts, useBalances, useBreakdown, useCategoryTrend, useTrend } from "../hooks/useApi";
 import { Card, Select, Label } from "../components/ui";
 import { formatMoney } from "../lib/format";
 import { CHROME, DIVERGING, categoricalColor, useIsDarkMode } from "../lib/palette";
@@ -67,6 +67,23 @@ export function Dashboard() {
     accountId: accountId || undefined,
     groupId: groupId || undefined,
     ...monthRange,
+  });
+
+  const [categoryTrendMonths, setCategoryTrendMonths] = useState(6);
+  // Always spans multiple months regardless of the Period/Month pickers
+  // above (those narrow everything else to one window) - "month on month"
+  // only means something as its own longer, independent range.
+  const categoryTrendRange = useMemo(() => {
+    const now = new Date();
+    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (categoryTrendMonths - 1), 1)).toISOString();
+    const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999)).toISOString();
+    return { from, to };
+  }, [categoryTrendMonths]);
+  const { data: categoryTrend } = useCategoryTrend({
+    type: "EXPENSE",
+    accountId: accountId || undefined,
+    groupId: groupId || undefined,
+    ...categoryTrendRange,
   });
 
   const totalBalance = useMemo(() => (balances ?? []).reduce((sum, a) => sum + a.balance, 0), [balances]);
@@ -222,6 +239,72 @@ export function Dashboard() {
           </BarChart>
         </ResponsiveContainer>
         {breakdownWithOther.length === 0 && <p className="py-6 text-center text-sm text-slate-500">No expenses in range yet.</p>}
+      </Card>
+
+      <Card>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Category spend by month</h2>
+          <Select
+            className="w-auto"
+            value={String(categoryTrendMonths)}
+            onChange={(e) => setCategoryTrendMonths(Number(e.target.value))}
+          >
+            <option value="3">Last 3 months</option>
+            <option value="6">Last 6 months</option>
+            <option value="12">Last 12 months</option>
+          </Select>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+              <tr>
+                <th className="whitespace-nowrap px-3 py-2 font-medium">Category</th>
+                {categoryTrend?.months.map((m) => (
+                  <th key={m.key} className="whitespace-nowrap px-3 py-2 text-right font-medium">
+                    {m.label}
+                  </th>
+                ))}
+                <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {categoryTrend?.rows.map((r) => (
+                <tr key={r.categoryId}>
+                  <td className="whitespace-nowrap px-3 py-2 text-slate-800 dark:text-slate-100">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full" style={{ background: r.color ?? "#94a3b8" }} />
+                      {r.name}
+                    </span>
+                  </td>
+                  {r.totals.map((v, i) => (
+                    <td key={categoryTrend.months[i].key} className="whitespace-nowrap px-3 py-2 text-right text-slate-600 dark:text-slate-300">
+                      {v > 0 ? formatMoney(v) : "—"}
+                    </td>
+                  ))}
+                  <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-slate-900 dark:text-white">
+                    {formatMoney(r.total)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            {categoryTrend && categoryTrend.months.length > 0 && (
+              <tfoot>
+                <tr className="border-t border-slate-200 font-semibold dark:border-slate-800">
+                  <td className="whitespace-nowrap px-3 py-2">Total</td>
+                  {categoryTrend.months.map((m, i) => (
+                    <td key={m.key} className="whitespace-nowrap px-3 py-2 text-right">
+                      {formatMoney(categoryTrend.rows.reduce((s, r) => s + r.totals[i], 0))}
+                    </td>
+                  ))}
+                  <td className="whitespace-nowrap px-3 py-2 text-right">
+                    {formatMoney(categoryTrend.rows.reduce((s, r) => s + r.total, 0))}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+        {(categoryTrend?.rows.length ?? 0) === 0 && <p className="py-6 text-center text-sm text-slate-500">No expenses in range yet.</p>}
       </Card>
 
       {fundsAcrossAccounts.length > 0 && (

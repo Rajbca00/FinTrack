@@ -237,3 +237,7 @@ export function useTrend(params: { period: "week" | "month" | "year"; from?: str
 export function useBreakdown(params: { from?: string; to?: string; accountId?: string; groupId?: string; type: "INCOME" | "EXPENSE" }) {
   return useQuery({ queryKey: ["breakdown", params], queryFn: () => api.getBreakdown(params) });
 }
+
+export function useCategoryTrend(params: { from?: string; to?: string; accountId?: string; groupId?: string; type: "INCOME" | "EXPENSE" }) {
+  return useQuery({ queryKey: ["categoryTrend", params], queryFn: () => api.getCategoryTrend(params) });
+}

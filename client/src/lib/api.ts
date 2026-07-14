@@ -250,3 +250,16 @@ export const getBreakdown = (params: {
   type: "INCOME" | "EXPENSE";
 }) => api.get<BreakdownPoint[]>("/summary/breakdown", { params }).then((r) => r.data);
 export const getBalances = () => api.get<AccountBalance[]>("/summary/balances").then((r) => r.data);
+
+export type CategoryTrendMonth = { key: string; label: string };
+export type CategoryTrendRow = { categoryId: string; name: string; color: string | null; totals: number[]; total: number };
+export const getCategoryTrend = (params: {
+  from?: string;
+  to?: string;
+  accountId?: string;
+  groupId?: string;
+  type: "INCOME" | "EXPENSE";
+}) =>
+  api
+    .get<{ months: CategoryTrendMonth[]; rows: CategoryTrendRow[] }>("/summary/category-trend", { params })
+    .then((r) => r.data);
