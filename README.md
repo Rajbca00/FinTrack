@@ -41,6 +41,8 @@ own funds and a temple/trust fund you manage, inside the same ICICI account).
 
 In production, the server also serves the built client as static files (plus a
 SPA fallback), so the whole app is one Node web service - see **Deployment** below.
+There's also a Vercel-native deployment (static client + serverless API) - see
+**Deployment (Vercel + Neon)** below.
 
 ## Getting started (local development)
 
@@ -128,6 +130,52 @@ Keep the printed hash - you'll paste it into Render as `BASIC_AUTH_PASSWORD_HASH
 Every subsequent `git push` to this branch (once connected) triggers a new
 Render deploy automatically.
 
+## Deployment (Vercel + Neon)
+
+On Vercel the app splits into two pieces instead of one Node service: the
+built client is served as static files from Vercel's CDN, and the Express API
+(`server/src/app.ts`) runs as a serverless function at `/api/*`
+(`api/[...path].ts`). A root `middleware.ts` runs Basic Auth in front of
+*every* request - including the static assets, which the API's own Basic Auth
+middleware can no longer gate once they're split out to the CDN.
+
+### 1. Create the database (Neon)
+
+Same as the Render setup above. Use the **pooled** connection string (the one
+with `-pooler` in the hostname, or `?pgbouncer=true` appended) rather than the
+direct one - serverless functions can spin up many concurrent instances, and
+without pooling you can exhaust Postgres's connection limit quickly.
+
+### 2. Generate your login credentials
+
+Same as [step 2](#2-generate-your-login-credentials) above:
+`npm run hash-password -- "your-password-here"` from `server/`.
+
+### 3. Deploy (Vercel)
+
+1. Push this repo to GitHub.
+2. In the Vercel dashboard: **Add New → Project**, import this repo. Vercel
+   will detect the root `vercel.json` (build command, output directory,
+   rewrites) and the `api/` and `middleware.ts` functions automatically - no
+   framework preset needed.
+3. In **Project Settings → Environment Variables**, add:
+   - `DATABASE_URL` - the pooled Neon connection string from step 1
+   - `BASIC_AUTH_USER` - whatever username you want
+   - `BASIC_AUTH_PASSWORD_HASH` - the hash from step 2
+4. Deploy. The build runs `prisma migrate deploy` against `DATABASE_URL`
+   before building the client, so every deploy (including preview
+   deployments, if `DATABASE_URL` is shared across environments) applies any
+   pending migrations. The first deploy will have an empty database - run the
+   seed script once against production, e.g. from your machine:
+   ```bash
+   DATABASE_URL="<your Neon connection string>" npx tsx server/prisma/seed.ts
+   ```
+5. Visit the `.vercel.app` URL Vercel gives you. Your browser will prompt for
+   the username/password you set above.
+
+Every subsequent `git push` to this branch (once connected) triggers a new
+Vercel deploy automatically.
+
 ## Project layout
 
 ```
@@ -143,4 +191,6 @@ client/
   src/components/        shared UI (TransactionTable, ImportWizard, ui primitives)
   src/hooks/useApi.ts     TanStack Query hooks wrapping the API client
   src/lib/api.ts          typed API client
+api/[...path].ts          Vercel-only: wraps the Express app as a serverless function
+middleware.ts              Vercel-only: Basic Auth in front of every request
 ```

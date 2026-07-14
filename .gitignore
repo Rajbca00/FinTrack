@@ -9,3 +9,5 @@ server/prisma/dev.db-journal
 
 .DS_Store
 *.log
+
+.vercel
