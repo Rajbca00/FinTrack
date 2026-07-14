@@ -7,11 +7,14 @@ import {
   useTransactions,
   useCreateGroup,
   useDeleteGroup,
+  useUpdateAccount,
+  useUpdateGroup,
 } from "../hooks/useApi";
 import { Card, Button, Modal, Input, Label, Badge } from "../components/ui";
 import { ImportWizard } from "../components/ImportWizard";
 import { TransactionTable } from "../components/TransactionTable";
 import { formatMoney } from "../lib/format";
+import type { Account } from "../lib/api";
 
 export function AccountDetail() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +23,7 @@ export function AccountDetail() {
   const { data: categories } = useCategories();
   const [showImport, setShowImport] = useState(false);
   const [showAddGroup, setShowAddGroup] = useState(false);
+  const [showEditAccount, setShowEditAccount] = useState(false);
   const [activeGroupId, setActiveGroupId] = useState<string | undefined>(undefined);
   const createGroup = useCreateGroup();
   const deleteGroup = useDeleteGroup();
@@ -46,6 +50,9 @@ export function AccountDetail() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowEditAccount(true)}>
+            Edit account
+          </Button>
           <Button variant="secondary" onClick={() => setShowAddGroup(true)}>
             + Add group
           </Button>
@@ -110,7 +117,91 @@ export function AccountDetail() {
           onCreate={(data) => createGroup.mutate({ accountId: account.id, data })}
         />
       )}
+      {showEditAccount && <EditAccountModal account={account} onClose={() => setShowEditAccount(false)} />}
     </div>
+  );
+}
+
+function EditAccountModal({ account, onClose }: { account: Account; onClose: () => void }) {
+  const updateAccount = useUpdateAccount();
+  const updateGroup = useUpdateGroup();
+  const defaultGroup = account.groups.find((g) => g.isDefault);
+
+  const [name, setName] = useState(account.name);
+  const [institution, setInstitution] = useState(account.institution ?? "");
+  const [last4, setLast4] = useState(account.last4 ?? "");
+  const [currency, setCurrency] = useState(account.currency);
+  const [creditLimit, setCreditLimit] = useState(account.creditLimit != null ? String(account.creditLimit) : "");
+  const [openingBalance, setOpeningBalance] = useState(defaultGroup ? String(defaultGroup.openingBalance) : "0");
+
+  return (
+    <Modal title="Edit account" onClose={onClose}>
+      <div className="flex flex-col gap-3">
+        <div>
+          <Label>Name</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Institution</Label>
+            <Input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="e.g. ICICI" />
+          </div>
+          <div>
+            <Label>Last 4 digits</Label>
+            <Input value={last4} onChange={(e) => setLast4(e.target.value)} placeholder="1234" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Currency</Label>
+            <Input value={currency} onChange={(e) => setCurrency(e.target.value)} />
+          </div>
+          {account.type === "CREDIT_CARD" && (
+            <div>
+              <Label>Credit limit</Label>
+              <Input type="number" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} />
+            </div>
+          )}
+        </div>
+        {defaultGroup && (
+          <div>
+            <Label>{account.isMultiPurpose ? `Initial balance (${defaultGroup.name})` : "Initial balance"}</Label>
+            <Input type="number" step="0.01" value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} />
+            {account.isMultiPurpose && (
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                This account has multiple groups - this only changes the starting balance of "{defaultGroup.name}". Edit
+                other groups' balances separately.
+              </p>
+            )}
+          </div>
+        )}
+        <Button
+          className="mt-2"
+          onClick={() => {
+            if (!name.trim()) return;
+            updateAccount.mutate({
+              id: account.id,
+              data: {
+                name: name.trim(),
+                institution: institution.trim() || null,
+                last4: last4.trim() || null,
+                currency: currency.trim() || "INR",
+                creditLimit: account.type === "CREDIT_CARD" ? Number(creditLimit) || null : null,
+              },
+            });
+            if (defaultGroup) {
+              const newBalance = Number(openingBalance) || 0;
+              if (newBalance !== defaultGroup.openingBalance) {
+                updateGroup.mutate({ id: defaultGroup.id, data: { openingBalance: newBalance } });
+              }
+            }
+            onClose();
+          }}
+        >
+          Save changes
+        </Button>
+      </div>
+    </Modal>
   );
 }
 

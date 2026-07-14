@@ -7,6 +7,7 @@ export const groupsRouter = Router();
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   color: z.string().optional().nullable(),
+  openingBalance: z.number().optional(),
 });
 
 groupsRouter.put("/:id", async (req, res) => {

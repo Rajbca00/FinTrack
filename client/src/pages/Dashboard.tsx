@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { endOfMonth, startOfMonth } from "date-fns";
 import {
   Bar,
   BarChart,
@@ -11,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { useAccounts, useBalances, useBreakdown, useTrend } from "../hooks/useApi";
-import { Card, Select, Label } from "../components/ui";
+import { Card, Select, Label, Input, Button } from "../components/ui";
 import { formatMoney } from "../lib/format";
 import { CHROME, DIVERGING, categoricalColor, useIsDarkMode } from "../lib/palette";
 
@@ -27,11 +28,31 @@ export function Dashboard() {
   const [period, setPeriod] = useState<Period>("month");
   const [accountId, setAccountId] = useState("");
   const [groupId, setGroupId] = useState("");
+  // Only meaningful when period === "month" - lets the charts narrow down to
+  // one specific month instead of showing the whole transaction history.
+  const [selectedMonth, setSelectedMonth] = useState("");
 
   const selectedAccount = accounts?.find((a) => a.id === accountId);
 
-  const { data: trend } = useTrend({ period, accountId: accountId || undefined, groupId: groupId || undefined });
-  const { data: breakdown } = useBreakdown({ type: "EXPENSE", accountId: accountId || undefined, groupId: groupId || undefined });
+  const monthRange = useMemo(() => {
+    if (period !== "month" || !selectedMonth) return {};
+    const start = startOfMonth(new Date(`${selectedMonth}-01T00:00:00`));
+    const end = endOfMonth(start);
+    return { from: start.toISOString(), to: end.toISOString() };
+  }, [period, selectedMonth]);
+
+  const { data: trend } = useTrend({
+    period,
+    accountId: accountId || undefined,
+    groupId: groupId || undefined,
+    ...monthRange,
+  });
+  const { data: breakdown } = useBreakdown({
+    type: "EXPENSE",
+    accountId: accountId || undefined,
+    groupId: groupId || undefined,
+    ...monthRange,
+  });
 
   const totalBalance = useMemo(() => (balances ?? []).reduce((sum, a) => sum + a.balance, 0), [balances]);
   const currentPeriod = trend?.[trend.length - 1];
@@ -58,12 +79,37 @@ export function Dashboard() {
       <Card className="flex flex-wrap items-end gap-4">
         <div className="w-40">
           <Label>Period</Label>
-          <Select value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
+          <Select
+            value={period}
+            onChange={(e) => {
+              const next = e.target.value as Period;
+              setPeriod(next);
+              if (next !== "month") setSelectedMonth("");
+            }}
+          >
             <option value="week">Weekly</option>
             <option value="month">Monthly</option>
             <option value="year">Annually</option>
           </Select>
         </div>
+        {period === "month" && (
+          <div className="w-44">
+            <Label>Month</Label>
+            <div className="flex gap-1">
+              <Input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                max={new Date().toISOString().slice(0, 7)}
+              />
+              {selectedMonth && (
+                <Button variant="ghost" onClick={() => setSelectedMonth("")}>
+                  ✕
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
         <div className="w-56">
           <Label>Account</Label>
           <Select
@@ -120,7 +166,9 @@ export function Dashboard() {
       </Card>
 
       <Card>
-        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-200">Spending by category</h2>
+        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-200">
+          Spending by category{selectedMonth ? ` — ${currentPeriod?.label ?? ""}` : ""}
+        </h2>
         <ResponsiveContainer width="100%" height={Math.max(120, breakdownWithOther.length * 36)}>
           <BarChart data={breakdownWithOther} layout="vertical" margin={{ left: 24 }}>
             <CartesianGrid horizontal={false} stroke={chrome.gridline} />

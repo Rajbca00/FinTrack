@@ -152,6 +152,38 @@ export function useDeleteTransaction() {
   });
 }
 
+export function useBulkCategorize() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ transactionIds, categoryId }: { transactionIds: string[]; categoryId: string }) =>
+      api.bulkCategorize(transactionIds, categoryId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["transactions"] }),
+  });
+}
+
+export function useBulkMoveGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ transactionIds, groupId }: { transactionIds: string[]; groupId: string }) =>
+      api.bulkMoveGroup(transactionIds, groupId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["balances"] });
+    },
+  });
+}
+
+export function useBulkDeleteTransactions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.bulkDeleteTransactions,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["balances"] });
+    },
+  });
+}
+
 export function useTransfers() {
   return useQuery({ queryKey: ["transfers"], queryFn: api.listTransfers });
 }

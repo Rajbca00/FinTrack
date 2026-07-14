@@ -154,6 +154,10 @@ export const updateTransaction = (id: string, data: Partial<Transaction>) =>
 export const deleteTransaction = (id: string) => api.delete(`/transactions/${id}`);
 export const bulkCategorize = (transactionIds: string[], categoryId: string) =>
   api.post("/transactions/bulk-categorize", { transactionIds, categoryId });
+export const bulkMoveGroup = (transactionIds: string[], groupId: string) =>
+  api.post("/transactions/bulk-move-group", { transactionIds, groupId });
+export const bulkDeleteTransactions = (transactionIds: string[]) =>
+  api.post<{ deleted: number }>("/transactions/bulk-delete", { transactionIds }).then((r) => r.data);
 
 // --- Import ---
 export type ImportPreview = {

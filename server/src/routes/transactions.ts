@@ -112,3 +112,34 @@ transactionsRouter.post("/bulk-categorize", async (req, res) => {
   });
   res.json({ updated: count });
 });
+
+const bulkMoveGroupSchema = z.object({
+  transactionIds: z.array(z.string()).min(1),
+  groupId: z.string().min(1),
+});
+
+transactionsRouter.post("/bulk-move-group", async (req, res) => {
+  const parsed = bulkMoveGroupSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { count } = await prisma.transaction.updateMany({
+    where: { id: { in: parsed.data.transactionIds } },
+    data: { groupId: parsed.data.groupId },
+  });
+  res.json({ updated: count });
+});
+
+const bulkDeleteSchema = z.object({
+  transactionIds: z.array(z.string()).min(1),
+});
+
+transactionsRouter.post("/bulk-delete", async (req, res) => {
+  const parsed = bulkDeleteSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  // Transfers are excluded (same rule as the single-delete endpoint) so a bulk
+  // delete can't silently break a transfer's paired leg - delete those from
+  // the Transfers view instead.
+  const { count } = await prisma.transaction.deleteMany({
+    where: { id: { in: parsed.data.transactionIds }, isTransfer: false },
+  });
+  res.json({ deleted: count });
+});

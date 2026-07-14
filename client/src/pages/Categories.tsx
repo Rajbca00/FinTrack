@@ -2,15 +2,16 @@ import { useState } from "react";
 import {
   useCategories,
   useCreateCategory,
+  useUpdateCategory,
   useDeleteCategory,
   useRules,
   useCreateRule,
-  useDeleteRule,
   useUpdateRule,
+  useDeleteRule,
   useApplyRules,
 } from "../hooks/useApi";
 import { Card, Button, Modal, Input, Select, Label, Badge } from "../components/ui";
-import type { AmountSign, CategoryType, MatchType } from "../lib/api";
+import type { AmountSign, Category, CategoryRule, CategoryType, MatchType } from "../lib/api";
 
 export function Categories() {
   const { data: categories } = useCategories();
@@ -21,6 +22,8 @@ export function Categories() {
   const applyRules = useApplyRules();
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showAddRule, setShowAddRule] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingRule, setEditingRule] = useState<CategoryRule | null>(null);
 
   return (
     <div className="flex flex-col gap-8">
@@ -39,6 +42,9 @@ export function Categories() {
                 <Badge color={c.color}>{c.name}</Badge>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <span>{c.type.toLowerCase()}</span>
+                  <button className="hover:text-blue-500" onClick={() => setEditingCategory(c)}>
+                    Edit
+                  </button>
                   {!c.isSystem && (c._count?.transactions ?? 0) === 0 && (
                     <button className="hover:text-red-500" onClick={() => deleteCategory.mutate(c.id)}>
                       Delete
@@ -97,6 +103,9 @@ export function Categories() {
                     />
                   </td>
                   <td className="px-4 py-2 text-right">
+                    <button className="mr-3 text-xs text-slate-400 hover:text-blue-500" onClick={() => setEditingRule(r)}>
+                      Edit
+                    </button>
                     <button className="text-xs text-slate-400 hover:text-red-500" onClick={() => deleteRule.mutate(r.id)}>
                       Delete
                     </button>
@@ -111,6 +120,8 @@ export function Categories() {
 
       {showAddCategory && <AddCategoryModal onClose={() => setShowAddCategory(false)} />}
       {showAddRule && <AddRuleModal onClose={() => setShowAddRule(false)} />}
+      {editingCategory && <EditCategoryModal category={editingCategory} onClose={() => setEditingCategory(null)} />}
+      {editingRule && <EditRuleModal rule={editingRule} onClose={() => setEditingRule(null)} />}
     </div>
   );
 }
@@ -213,6 +224,125 @@ function AddRuleModal({ onClose }: { onClose: () => void }) {
           }}
         >
           Add rule
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+function EditCategoryModal({ category, onClose }: { category: Category; onClose: () => void }) {
+  const updateCategory = useUpdateCategory();
+  const [name, setName] = useState(category.name);
+  const [type, setType] = useState<CategoryType>(category.type === "TRANSFER" ? "EXPENSE" : category.type);
+  const [color, setColor] = useState(category.color ?? "#2a78d6");
+
+  return (
+    <Modal title="Edit category" onClose={onClose}>
+      <div className="flex flex-col gap-3">
+        <div>
+          <Label>Name</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </div>
+        <div>
+          <Label>Type</Label>
+          <Select
+            value={type}
+            onChange={(e) => setType(e.target.value as CategoryType)}
+            disabled={category.isSystem}
+          >
+            <option value="EXPENSE">Expense</option>
+            <option value="INCOME">Income</option>
+            {category.type === "TRANSFER" && <option value="TRANSFER">Transfer</option>}
+          </Select>
+          {category.isSystem && (
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">System category type can't be changed.</p>
+          )}
+        </div>
+        <div>
+          <Label>Color</Label>
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            className="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-700"
+          />
+        </div>
+        <Button
+          className="mt-2"
+          onClick={() => {
+            if (!name.trim()) return;
+            updateCategory.mutate({ id: category.id, data: { name: name.trim(), type, color } });
+            onClose();
+          }}
+        >
+          Save changes
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+function EditRuleModal({ rule, onClose }: { rule: CategoryRule; onClose: () => void }) {
+  const { data: categories } = useCategories();
+  const updateRule = useUpdateRule();
+  const [pattern, setPattern] = useState(rule.pattern);
+  const [matchType, setMatchType] = useState<MatchType>(rule.matchType);
+  const [amountSign, setAmountSign] = useState<AmountSign>(rule.amountSign);
+  const [categoryId, setCategoryId] = useState(rule.categoryId);
+  const [priority, setPriority] = useState(String(rule.priority));
+
+  return (
+    <Modal title="Edit auto-categorization rule" onClose={onClose}>
+      <div className="flex flex-col gap-3">
+        <div>
+          <Label>Pattern</Label>
+          <Input value={pattern} onChange={(e) => setPattern(e.target.value)} placeholder="e.g. swiggy|zomato" autoFocus />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Match type</Label>
+            <Select value={matchType} onChange={(e) => setMatchType(e.target.value as MatchType)}>
+              <option value="CONTAINS">Contains</option>
+              <option value="STARTS_WITH">Starts with</option>
+              <option value="REGEX">Regex</option>
+              <option value="EXACT">Exact match</option>
+            </Select>
+          </div>
+          <div>
+            <Label>Applies to</Label>
+            <Select value={amountSign} onChange={(e) => setAmountSign(e.target.value as AmountSign)}>
+              <option value="ANY">Any amount</option>
+              <option value="DEBIT">Money out only</option>
+              <option value="CREDIT">Money in only</option>
+            </Select>
+          </div>
+        </div>
+        <div>
+          <Label>Category</Label>
+          <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+            {categories?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div>
+          <Label>Priority (higher runs first)</Label>
+          <Input type="number" value={priority} onChange={(e) => setPriority(e.target.value)} />
+        </div>
+        <Button
+          className="mt-2"
+          disabled={!pattern.trim() || !categoryId}
+          onClick={() => {
+            updateRule.mutate({
+              id: rule.id,
+              data: { pattern: pattern.trim(), matchType, amountSign, categoryId, priority: Number(priority) || 0 },
+            });
+            onClose();
+          }}
+        >
+          Save changes
         </Button>
       </div>
     </Modal>
