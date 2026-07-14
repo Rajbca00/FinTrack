@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useAccounts, useCategories, useTransactions, useCreateTransaction, useApplyRules } from "../hooks/useApi";
+import { useAccounts, useCategories, useTransactions, useCreateTransaction, useCreateTransfer, useApplyRules } from "../hooks/useApi";
 import { TransactionTable } from "../components/TransactionTable";
 import { Card, Button, Select, Input, Label, Modal } from "../components/ui";
 
@@ -136,6 +136,7 @@ function AddTransactionModal({ onClose }: { onClose: () => void }) {
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
   const createTransaction = useCreateTransaction();
+  const createTransfer = useCreateTransfer();
 
   const [accountId, setAccountId] = useState("");
   const [groupId, setGroupId] = useState("");
@@ -143,8 +144,14 @@ function AddTransactionModal({ onClose }: { onClose: () => void }) {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [transferToAccountId, setTransferToAccountId] = useState("");
+  const [transferToGroupId, setTransferToGroupId] = useState("");
 
   const account = accounts?.find((a) => a.id === accountId);
+  const isTransferCategory = categories?.find((c) => c.id === categoryId)?.type === "TRANSFER";
+  const transferToAccount = accounts?.find((a) => a.id === transferToAccountId);
+  const sameAccountAndGroup =
+    isTransferCategory && accountId === transferToAccountId && groupId === transferToGroupId;
 
   return (
     <Modal title="Add transaction" onClose={onClose}>
@@ -188,12 +195,19 @@ function AddTransactionModal({ onClose }: { onClose: () => void }) {
           <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Coffee shop" />
         </div>
         <div>
-          <Label>Amount (negative = money out, positive = money in)</Label>
+          <Label>{isTransferCategory ? "Amount to transfer" : "Amount (negative = money out, positive = money in)"}</Label>
           <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="-250" />
         </div>
         <div>
           <Label>Category (optional, auto-detected if left blank)</Label>
-          <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          <Select
+            value={categoryId}
+            onChange={(e) => {
+              setCategoryId(e.target.value);
+              setTransferToAccountId("");
+              setTransferToGroupId("");
+            }}
+          >
             <option value="">Auto-detect</option>
             {categories?.map((c) => (
               <option key={c.id} value={c.id}>
@@ -202,22 +216,78 @@ function AddTransactionModal({ onClose }: { onClose: () => void }) {
             ))}
           </Select>
         </div>
+        {isTransferCategory && (
+          <>
+            <div>
+              <Label>Transfer to account</Label>
+              <Select
+                value={transferToAccountId}
+                onChange={(e) => {
+                  setTransferToAccountId(e.target.value);
+                  const acc = accounts?.find((a) => a.id === e.target.value);
+                  setTransferToGroupId(acc?.groups.find((g) => g.isDefault)?.id ?? acc?.groups[0]?.id ?? "");
+                }}
+              >
+                <option value="">Select account…</option>
+                {accounts?.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            {transferToAccount && transferToAccount.groups.length > 1 && (
+              <div>
+                <Label>Transfer to group</Label>
+                <Select value={transferToGroupId} onChange={(e) => setTransferToGroupId(e.target.value)}>
+                  {transferToAccount.groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+            {sameAccountAndGroup && (
+              <p className="text-xs text-red-500">Source and destination must be different.</p>
+            )}
+          </>
+        )}
         <Button
           className="mt-2"
-          disabled={!accountId || !groupId || !description.trim() || !amount}
+          disabled={
+            !accountId ||
+            !groupId ||
+            !description.trim() ||
+            !amount ||
+            (isTransferCategory && (!transferToAccountId || !transferToGroupId || sameAccountAndGroup))
+          }
           onClick={() => {
-            createTransaction.mutate({
-              accountId,
-              groupId,
-              date: new Date(date).toISOString(),
-              description: description.trim(),
-              amount: Number(amount),
-              categoryId: categoryId || undefined,
-            });
+            if (isTransferCategory) {
+              createTransfer.mutate({
+                type: "ACCOUNT_TRANSFER",
+                date: new Date(date).toISOString(),
+                amount: Math.abs(Number(amount)),
+                note: description.trim(),
+                fromAccountId: accountId,
+                fromGroupId: groupId,
+                toAccountId: transferToAccountId,
+                toGroupId: transferToGroupId,
+              });
+            } else {
+              createTransaction.mutate({
+                accountId,
+                groupId,
+                date: new Date(date).toISOString(),
+                description: description.trim(),
+                amount: Number(amount),
+                categoryId: categoryId || undefined,
+              });
+            }
             onClose();
           }}
         >
-          Add transaction
+          {isTransferCategory ? "Add transfer" : "Add transaction"}
         </Button>
       </div>
     </Modal>

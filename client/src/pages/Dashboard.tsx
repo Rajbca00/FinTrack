@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { endOfMonth, startOfMonth } from "date-fns";
+import { format, subMonths } from "date-fns";
 import {
   Bar,
   BarChart,
@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { useAccounts, useBalances, useBreakdown, useTrend } from "../hooks/useApi";
-import { Card, Select, Label, Input, Button } from "../components/ui";
+import { Card, Select, Label } from "../components/ui";
 import { formatMoney } from "../lib/format";
 import { CHROME, DIVERGING, categoricalColor, useIsDarkMode } from "../lib/palette";
 
@@ -34,11 +34,26 @@ export function Dashboard() {
 
   const selectedAccount = accounts?.find((a) => a.id === accountId);
 
+  // Last 24 months, newest first, as "yyyy-MM" values - matches the format
+  // produced by the monthly trend bucket keys in server/src/services/summary.ts.
+  const monthOptions = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 24 }, (_, i) => {
+      const d = subMonths(now, i);
+      return { value: format(d, "yyyy-MM"), label: format(d, "MMM yyyy") };
+    });
+  }, []);
+
   const monthRange = useMemo(() => {
     if (period !== "month" || !selectedMonth) return {};
-    const start = startOfMonth(new Date(`${selectedMonth}-01T00:00:00`));
-    const end = endOfMonth(start);
-    return { from: start.toISOString(), to: end.toISOString() };
+    const [year, month] = selectedMonth.split("-").map(Number);
+    // Transaction dates are stored UTC-midnight-anchored (see date-only
+    // handling in Transactions.tsx), so bounds are computed in UTC too -
+    // using local-time month math here would shift the boundary by the
+    // browser's UTC offset and clip transactions near month edges.
+    const from = new Date(Date.UTC(year, month - 1, 1)).toISOString();
+    const to = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)).toISOString();
+    return { from, to };
   }, [period, selectedMonth]);
 
   const { data: trend } = useTrend({
@@ -95,19 +110,14 @@ export function Dashboard() {
         {period === "month" && (
           <div className="w-44">
             <Label>Month</Label>
-            <div className="flex gap-1">
-              <Input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                max={new Date().toISOString().slice(0, 7)}
-              />
-              {selectedMonth && (
-                <Button variant="ghost" onClick={() => setSelectedMonth("")}>
-                  ✕
-                </Button>
-              )}
-            </div>
+            <Select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+              <option value="">All months</option>
+              {monthOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
           </div>
         )}
         <div className="w-56">
