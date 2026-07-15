@@ -85,7 +85,92 @@ export function TransactionTable({
           }}
         />
       )}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+      {/* Card layout for narrow (phone) viewports - the table below has too many
+          columns (checkbox, date, description, category, group, balance,
+          actions) to reflow sensibly at that width, even with horizontal
+          scroll, so it's a separate layout rather than a CSS-only reshuffle. */}
+      <div className="flex flex-col gap-2 sm:hidden">
+        {transactions.map((t) => (
+          <div key={t.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {!t.isTransfer && (
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(t.id)}
+                    onChange={() => toggleOne(t.id)}
+                    aria-label={`Select transaction ${t.description}`}
+                  />
+                )}
+                <span className="text-xs text-slate-500 dark:text-slate-400">{formatDate(t.date)}</span>
+              </div>
+              <span
+                className={`font-medium ${
+                  t.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-slate-700 dark:text-slate-200"
+                }`}
+              >
+                {formatMoney(t.amount, currency)}
+              </span>
+            </div>
+
+            <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">{t.description}</p>
+            {showAccountColumn && t.account && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t.account.name}</p>
+            )}
+
+            <div className="mt-2 flex flex-col gap-2">
+              <Select
+                value={t.categoryId ?? ""}
+                onChange={(e) => updateTransaction.mutate({ id: t.id, data: { categoryId: e.target.value || null } })}
+              >
+                <option value="">Uncategorized</option>
+                {assignableCategories(categories).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+              {groups && groups.length > 1 && (
+                <Select
+                  value={t.groupId}
+                  onChange={(e) => updateTransaction.mutate({ id: t.id, data: { groupId: e.target.value } })}
+                >
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </div>
+
+            {t.notes && <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t.notes}</p>}
+            {runningBalances && runningBalances[t.id] != null && (
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Balance: {formatMoney(runningBalances[t.id], currency)}
+              </p>
+            )}
+
+            <div className="mt-2 flex justify-end gap-1 border-t border-slate-100 pt-2 dark:border-slate-800">
+              <Button variant="ghost" onClick={() => setEditing(t)}>
+                Edit
+              </Button>
+              {!t.isTransfer && (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    if (confirm("Delete this transaction?")) deleteTransaction.mutate(t.id);
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 sm:block">
         <table className="w-full min-w-[900px] text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
             <tr>
