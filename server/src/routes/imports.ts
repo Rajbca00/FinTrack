@@ -97,9 +97,18 @@ importsRouter.post("/:accountId/confirm", async (req, res) => {
   }
 
   const { rows } = parseCsv(fileContent);
-  const normalized = normalizeRows(rows, mapping as ColumnMapping);
+  const { rows: normalized, invalid } = normalizeRows(rows, mapping as ColumnMapping);
   if (normalized.length === 0) {
-    return res.status(400).json({ error: "No valid rows found with the given column mapping" });
+    const invalidDates = invalid.filter((r) => r.reason === "invalid_date").length;
+    const missingDescriptions = invalid.filter((r) => r.reason === "missing_description").length;
+    return res.status(400).json({
+      error:
+        `None of the ${rows.length} row(s) could be read with this column mapping ` +
+        `(${invalidDates} had a date we couldn't parse, ${missingDescriptions} had no description). ` +
+        `Check the date format and column selections.`,
+      invalidRowCount: invalid.length,
+      invalidSamples: invalid.slice(0, 5),
+    });
   }
 
   const existingKeys = new Set(
@@ -112,7 +121,7 @@ importsRouter.post("/:accountId/confirm", async (req, res) => {
   );
 
   const batch = await prisma.importBatch.create({
-    data: { accountId, filename, rowCount: normalized.length },
+    data: { accountId, filename, rowCount: rows.length },
   });
 
   let created = 0;
@@ -151,7 +160,14 @@ importsRouter.post("/:accountId/confirm", async (req, res) => {
     data: { lastImportMapping: JSON.stringify(mapping), lastImportGroupId: groupId },
   });
 
-  res.status(201).json({ batchId: batch.id, created, skipped, total: normalized.length });
+  res.status(201).json({
+    batchId: batch.id,
+    created,
+    skipped,
+    total: rows.length,
+    invalidRowCount: invalid.length,
+    invalidSamples: invalid.slice(0, 5),
+  });
 });
 
 importsRouter.get("/:accountId/batches", async (req, res) => {

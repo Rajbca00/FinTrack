@@ -107,7 +107,21 @@ export function Dashboard() {
     ...categoryTrendRange,
   });
 
-  const totalBalance = useMemo(() => (balances ?? []).reduce((sum, a) => sum + a.balance, 0), [balances]);
+  // Mirrors the Account/Group filters above (and reportGroupIds, which the
+  // trend/breakdown queries already use) so "Total balance" doesn't silently
+  // stay account-wide while every other stat on the page is scoped down.
+  const totalBalance = useMemo(() => {
+    if (!balances) return 0;
+    if (reportGroupIds) {
+      const groupIds = new Set(reportGroupIds);
+      return balances.reduce(
+        (sum, a) => sum + a.groups.filter((g) => groupIds.has(g.id)).reduce((s, g) => s + g.balance, 0),
+        0
+      );
+    }
+    const scope = accountId ? balances.filter((a) => a.id === accountId) : balances;
+    return scope.reduce((sum, a) => sum + a.balance, 0);
+  }, [balances, accountId, reportGroupIds]);
 
   // Groups are scoped to a single account in the data model (no cross-account
   // group exists), so this rolls up same-named groups across accounts for
