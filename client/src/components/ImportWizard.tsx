@@ -1,10 +1,25 @@
 import { useRef, useState } from "react";
 import { Modal, Button, Select, Label } from "./ui";
-import { previewImport, confirmImport, type ColumnMapping, type ImportPreview } from "../lib/api";
+import { previewImport, confirmImport, type ColumnMapping, type DateFormat, type ImportPreview } from "../lib/api";
 import type { Group } from "../lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 
 type Mode = "select" | "map" | "done";
+
+// Client-side mirror of the server's ambiguous-date interpretation, purely
+// so the mapping step can show "this is how we'll read your first row" next
+// to the date format picker - the actual import still parses server-side.
+function previewDateInterpretation(raw: string | undefined, dateFormat: DateFormat): string | null {
+  if (!raw) return null;
+  const match = raw.trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (!match) return null;
+  const [, a, b, yRaw] = match;
+  const y = yRaw.length === 2 ? `20${yRaw}` : yRaw;
+  const [d, m] = dateFormat === "MDY" ? [b, a] : [a, b];
+  const date = new Date(Number(y), Number(m) - 1, Number(d));
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export function ImportWizard({ accountId, groups, onClose }: { accountId: string; groups: Group[]; onClose: () => void }) {
   const qc = useQueryClient();
@@ -19,6 +34,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
   const [amountColumn, setAmountColumn] = useState("");
   const [debitColumn, setDebitColumn] = useState("");
   const [creditColumn, setCreditColumn] = useState("");
+  const [dateFormat, setDateFormat] = useState<DateFormat>("DMY");
   const [groupId, setGroupId] = useState(groups.find((g) => g.isDefault)?.id ?? groups[0]?.id ?? "");
   const [applyRules, setApplyRules] = useState(true);
   const [usingSavedMapping, setUsingSavedMapping] = useState(false);
@@ -32,6 +48,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
     debitColumn?: string | null;
     creditColumn?: string | null;
     amountColumn?: string | null;
+    dateFormat?: DateFormat;
   }) => {
     setDateColumn(mapping.dateColumn ?? "");
     setDescriptionColumn(mapping.descriptionColumn ?? "");
@@ -43,6 +60,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
       setAmountMode("single");
       setAmountColumn(mapping.amountColumn ?? "");
     }
+    if (mapping.dateFormat) setDateFormat(mapping.dateFormat);
   };
 
   const handleFile = async (file: File) => {
@@ -56,9 +74,13 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
       setPreview(p);
       if (p.savedMapping) {
         applyMapping(p.savedMapping);
+        // Older saved mappings (from before date-format detection existed)
+        // won't have this field - fall back to the fresh auto-detection.
+        if (!p.savedMapping.dateFormat) setDateFormat(p.suggestedDateFormat);
         setUsingSavedMapping(true);
       } else {
         applyMapping(p.suggestedMapping);
+        setDateFormat(p.suggestedDateFormat);
         setUsingSavedMapping(false);
       }
       if (p.savedGroupId) setGroupId(p.savedGroupId);
@@ -76,8 +98,8 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
     try {
       const mapping: ColumnMapping =
         amountMode === "single"
-          ? { dateColumn, descriptionColumn, amountColumn }
-          : { dateColumn, descriptionColumn, debitColumn, creditColumn };
+          ? { dateColumn, descriptionColumn, amountColumn, dateFormat }
+          : { dateColumn, descriptionColumn, debitColumn, creditColumn, dateFormat };
       const res = await confirmImport(accountId, { fileContent, filename, mapping, groupId, applyRules });
       setResult(res);
       setMode("done");
@@ -126,6 +148,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
                 className="font-medium underline"
                 onClick={() => {
                   applyMapping(preview.suggestedMapping);
+                  setDateFormat(preview.suggestedDateFormat);
                   setUsingSavedMapping(false);
                 }}
               >
@@ -139,6 +162,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
                 className="font-medium text-brand underline"
                 onClick={() => {
                   applyMapping(preview.savedMapping!);
+                  if (!preview.savedMapping!.dateFormat) setDateFormat(preview.suggestedDateFormat);
                   setUsingSavedMapping(true);
                   if (preview.savedGroupId) setGroupId(preview.savedGroupId);
                 }}
@@ -169,6 +193,24 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
                 ))}
               </Select>
             </div>
+          </div>
+
+          <div>
+            <Label>Date format (which position is the day?)</Label>
+            <Select value={dateFormat} onChange={(e) => setDateFormat(e.target.value as DateFormat)}>
+              <option value="DMY">DD/MM/YYYY - day first (e.g. India, UK)</option>
+              <option value="MDY">MM/DD/YYYY - month first (e.g. US)</option>
+              <option value="YMD">YYYY-MM-DD - year first (ISO)</option>
+            </Select>
+            {(() => {
+              const example = previewDateInterpretation(preview.sampleRows[0]?.[dateColumn], dateFormat);
+              return example ? (
+                <p className="mt-1 text-xs text-ink-muted">
+                  First row will be read as <span className="font-medium text-ink-secondary">{example}</span> - check
+                  this matches your statement before importing.
+                </p>
+              ) : null;
+            })()}
           </div>
 
           <div>

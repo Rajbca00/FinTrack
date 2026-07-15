@@ -52,6 +52,12 @@ export function suggestMapping(headers: string[]): SuggestedMapping {
   };
 }
 
+// Which position the day falls in for ambiguous slash/dash-separated dates
+// (e.g. "03/04/2026") - there's no way to tell from a single date string
+// whether that's 3 Apr or Mar 4, so this must come from the user (via
+// auto-detection across the whole file where possible, else a manual pick).
+export type DateFormat = "DMY" | "MDY" | "YMD";
+
 export type ColumnMapping = {
   dateColumn: string;
   descriptionColumn: string;
@@ -61,6 +67,8 @@ export type ColumnMapping = {
   creditColumn?: string;
   // If amountColumn values are unsigned magnitudes, this says whether positive means debit.
   invertAmount?: boolean;
+  // Defaults to "DMY" (matches the previous hard-coded behavior) when omitted.
+  dateFormat?: DateFormat;
 };
 
 export type NormalizedRow = {
@@ -76,14 +84,18 @@ function parseAmount(raw: string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function parseDate(raw: string): string | null {
+// Matches "07/10/2026" or "07-10-2026" - the ambiguous slash/dash shape where
+// the day could be in either the first or second position.
+const AMBIGUOUS_DATE_RE = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/;
+
+function parseDate(raw: string, dateFormat: DateFormat = "DMY"): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
-  // DD/MM/YYYY or DD-MM-YYYY
-  const dmy = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-  if (dmy) {
-    let [, d, m, y] = dmy;
-    if (y.length === 2) y = `20${y}`;
+  const match = trimmed.match(AMBIGUOUS_DATE_RE);
+  if (match) {
+    const [, a, b, yRaw] = match;
+    const y = yRaw.length === 2 ? `20${yRaw}` : yRaw;
+    const [d, m] = dateFormat === "MDY" ? [b, a] : [a, b];
     const iso = new Date(Number(y), Number(m) - 1, Number(d));
     if (!Number.isNaN(iso.getTime())) return iso.toISOString();
   }
@@ -92,10 +104,28 @@ function parseDate(raw: string): string | null {
   return null;
 }
 
+// Scans every value in a date column and infers DMY vs MDY from whichever
+// position ever exceeds 12 (which can only be a day, never a month) - e.g.
+// a "25/03/2026" anywhere in the file proves the file is day-first. Falls
+// back to DMY (the previous hard-coded assumption) when the file never
+// disambiguates itself, since that's still the more common convention
+// (e.g. Indian/UK bank exports) and matches prior behavior for such files.
+export function detectDateFormat(values: string[]): DateFormat {
+  for (const raw of values) {
+    const match = (raw ?? "").trim().match(AMBIGUOUS_DATE_RE);
+    if (!match) continue;
+    const a = Number(match[1]);
+    const b = Number(match[2]);
+    if (a > 12) return "DMY";
+    if (b > 12) return "MDY";
+  }
+  return "DMY";
+}
+
 export function normalizeRows(rows: Record<string, string>[], mapping: ColumnMapping): NormalizedRow[] {
   const out: NormalizedRow[] = [];
   for (const row of rows) {
-    const dateISO = parseDate(row[mapping.dateColumn] ?? "");
+    const dateISO = parseDate(row[mapping.dateColumn] ?? "", mapping.dateFormat);
     const description = (row[mapping.descriptionColumn] ?? "").trim();
     if (!dateISO || !description) continue;
 
