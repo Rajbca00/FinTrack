@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { parseCsv, suggestMapping, normalizeRows, ColumnMapping } from "../services/csvImport";
+import { parseCsv, suggestMapping, normalizeRows, detectDateFormat, ColumnMapping } from "../services/csvImport";
 import { dedupeKey } from "../lib/dedupe";
 import { categorize } from "../services/rulesEngine";
 
@@ -46,11 +46,21 @@ importsRouter.post("/:accountId/preview", async (req, res) => {
   const savedGroupId =
     account.lastImportGroupId && account.groups.some((g) => g.id === account.lastImportGroupId) ? account.lastImportGroupId : null;
 
+  const suggestedMapping = suggestMapping(headers);
+  // Detect against every row (not just the preview sample) so a single
+  // disambiguating date late in the file - e.g. one "25/03/2026" - is enough
+  // to catch a day-first file even if the first 10 rows are all ambiguous.
+  const dateColumnForDetection = savedMapping?.dateColumn ?? suggestedMapping.dateColumn;
+  const suggestedDateFormat = dateColumnForDetection
+    ? detectDateFormat(rows.map((r) => r[dateColumnForDetection] ?? ""))
+    : "DMY";
+
   res.json({
     headers,
     sampleRows: rows.slice(0, 10),
     rowCount: rows.length,
-    suggestedMapping: suggestMapping(headers),
+    suggestedMapping,
+    suggestedDateFormat,
     savedMapping,
     savedGroupId,
     groups: account.groups,
@@ -64,6 +74,7 @@ const columnMappingSchema = z.object({
   debitColumn: z.string().optional(),
   creditColumn: z.string().optional(),
   invertAmount: z.boolean().optional(),
+  dateFormat: z.enum(["DMY", "MDY", "YMD"]).optional(),
 });
 
 const confirmSchema = z.object({

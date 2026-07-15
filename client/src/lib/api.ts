@@ -215,9 +215,18 @@ export type ImportPreview = {
   savedMapping: ColumnMapping | null;
   savedGroupId: string | null;
   groups: Group[];
+  // Best guess at day-first vs month-first, from scanning every date value in
+  // the file for one that's unambiguous (e.g. day > 12) - falls back to "DMY"
+  // when the file never disambiguates itself.
+  suggestedDateFormat: DateFormat;
 };
 export const previewImport = (accountId: string, fileContent: string, filename: string) =>
   api.post<ImportPreview>(`/import/${accountId}/preview`, { fileContent, filename }).then((r) => r.data);
+
+// Which position the day falls in for ambiguous slash/dash dates like
+// "07/10/2026" - there's no way to tell from a single value, so this has to
+// come from the user (auto-detected where possible, else picked manually).
+export type DateFormat = "DMY" | "MDY" | "YMD";
 
 export type ColumnMapping = {
   dateColumn: string;
@@ -226,6 +235,7 @@ export type ColumnMapping = {
   debitColumn?: string;
   creditColumn?: string;
   invertAmount?: boolean;
+  dateFormat?: DateFormat;
 };
 export const confirmImport = (
   accountId: string,
