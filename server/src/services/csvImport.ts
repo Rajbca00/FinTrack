@@ -85,8 +85,13 @@ function parseAmount(raw: string | undefined): number {
 }
 
 // Matches "07/10/2026" or "07-10-2026" - the ambiguous slash/dash shape where
-// the day could be in either the first or second position.
-const AMBIGUOUS_DATE_RE = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/;
+// the day could be in either the first or second position. Deliberately not
+// anchored at the end: some exports (seen in credit card statements) append
+// a time-of-day after the date, e.g. "13/05/2026 / 00:00" - the date is
+// always the leading component, and the app stores dates without a
+// time-of-day anyway, so anything trailing the date itself is ignored
+// rather than making the whole value fail to parse.
+const AMBIGUOUS_DATE_RE = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/;
 
 function parseDate(raw: string, dateFormat: DateFormat = "DMY"): string | null {
   if (!raw) return null;
