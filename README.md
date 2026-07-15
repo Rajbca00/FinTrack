@@ -191,6 +191,6 @@ client/
   src/components/        shared UI (TransactionTable, ImportWizard, ui primitives)
   src/hooks/useApi.ts     TanStack Query hooks wrapping the API client
   src/lib/api.ts          typed API client
-api/[...path].ts          Vercel-only: wraps the Express app as a serverless function
+api/index.ts               Vercel-only: wraps the Express app as a serverless function
 middleware.ts              Vercel-only: Basic Auth in front of every request
 ```
