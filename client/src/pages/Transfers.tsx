@@ -115,15 +115,15 @@ export function Transfers() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Transfers</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <h1 className="text-xl font-semibold text-ink">Transfers</h1>
+        <p className="text-sm text-ink-muted">
           Move real money between accounts, or reallocate funds between purpose groups inside one account (e.g. Personal → Temple Fund).
         </p>
       </div>
 
       <Card className="flex flex-col gap-4">
         {editingId && (
-          <p className="text-xs text-blue-600 dark:text-blue-400">
+          <p className="text-xs text-brand">
             Editing an existing transfer - both linked transactions will be updated. Type can't be changed; delete and
             recreate it for that.
           </p>
@@ -249,7 +249,7 @@ export function Transfers() {
               </Select>
             </div>
             {accounts && accounts.filter((a) => a.groups.length > 1).length === 0 && (
-              <p className="col-span-3 text-xs text-slate-500">
+              <p className="col-span-3 text-xs text-ink-muted">
                 No account has more than one group yet. Add a group from an account's page first.
               </p>
             )}
@@ -282,15 +282,15 @@ export function Transfers() {
           )}
         </div>
         {(createTransfer.isError || updateTransfer.isError) && (
-          <p className="text-xs text-red-500">{getErrorMessage(createTransfer.error ?? updateTransfer.error)}</p>
+          <p className="text-xs text-critical">{getErrorMessage(createTransfer.error ?? updateTransfer.error)}</p>
         )}
       </Card>
 
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">History</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink-secondary">History</h2>
         <Card className="overflow-x-auto p-0">
           <table className="w-full min-w-[640px] text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-ink-muted dark:bg-white/5 dark:text-ink-muted">
               <tr>
                 <th className="px-4 py-2 font-medium">Date</th>
                 <th className="px-4 py-2 font-medium">Type</th>
@@ -301,14 +301,14 @@ export function Transfers() {
                 <th className="px-4 py-2" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-hairline">
               {transfers?.map((t) => {
                 const from = t.transactions.find((x) => x.amount < 0);
                 const to = t.transactions.find((x) => x.amount > 0);
                 return (
                   <tr key={t.id}>
                     <td className="px-4 py-2">{formatDate(t.date)}</td>
-                    <td className="px-4 py-2 text-xs text-slate-500">
+                    <td className="px-4 py-2 text-xs text-ink-muted">
                       {t.type === "ACCOUNT_TRANSFER" ? "Account transfer" : "Reallocation"}
                     </td>
                     <td className="px-4 py-2 text-xs">
@@ -317,14 +317,14 @@ export function Transfers() {
                     <td className="px-4 py-2 text-xs">
                       {to?.account?.name} · {to?.group?.name}
                     </td>
-                    <td className="px-4 py-2 text-xs text-slate-500">{t.note ?? "—"}</td>
+                    <td className="px-4 py-2 text-xs text-ink-muted">{t.note ?? "—"}</td>
                     <td className="px-4 py-2 text-right font-medium">{formatMoney(t.amount)}</td>
                     <td className="px-4 py-2 text-right">
-                      <button className="mr-3 text-xs text-slate-400 hover:text-blue-500" onClick={() => startEdit(t)}>
+                      <button className="mr-3 text-xs text-ink-muted hover:text-brand" onClick={() => startEdit(t)}>
                         Edit
                       </button>
                       <button
-                        className="text-xs text-slate-400 hover:text-red-500"
+                        className="text-xs text-ink-muted hover:text-critical"
                         onClick={() => {
                           if (confirm("Delete this transfer? Both linked transactions will be removed.")) deleteTransfer.mutate(t.id);
                         }}
@@ -337,7 +337,7 @@ export function Transfers() {
               })}
             </tbody>
           </table>
-          {(transfers?.length ?? 0) === 0 && <p className="p-6 text-center text-sm text-slate-500">No transfers recorded yet.</p>}
+          {(transfers?.length ?? 0) === 0 && <p className="p-6 text-center text-sm text-ink-muted">No transfers recorded yet.</p>}
         </Card>
       </div>
     </div>

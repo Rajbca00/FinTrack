@@ -31,8 +31,8 @@ export function Categories() {
       <div>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Categories</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Custom categories used to classify income and expenses.</p>
+            <h1 className="text-xl font-semibold text-ink">Categories</h1>
+            <p className="text-sm text-ink-muted">Custom categories used to classify income and expenses.</p>
           </div>
           <Button className="self-start sm:self-auto" onClick={() => setShowAddCategory(true)}>
             + Add category
@@ -41,15 +41,15 @@ export function Categories() {
         <Card>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {categories?.map((c) => (
-              <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 dark:border-slate-800">
+              <div key={c.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 dark:border-hairline">
                 <Badge color={c.color}>{c.name}</Badge>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
+                <div className="flex items-center gap-2 text-xs text-ink-muted">
                   <span>{c.type.toLowerCase()}</span>
-                  <button className="hover:text-blue-500" onClick={() => setEditingCategory(c)}>
+                  <button className="hover:text-brand" onClick={() => setEditingCategory(c)}>
                     Edit
                   </button>
                   {!c.isSystem && (c._count?.transactions ?? 0) === 0 && (
-                    <button className="hover:text-red-500" onClick={() => deleteCategory.mutate(c.id)}>
+                    <button className="hover:text-critical" onClick={() => deleteCategory.mutate(c.id)}>
                       Delete
                     </button>
                   )}
@@ -63,8 +63,8 @@ export function Categories() {
       <div>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Auto-categorization rules</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <h1 className="text-xl font-semibold text-ink">Auto-categorization rules</h1>
+            <p className="text-sm text-ink-muted">
               Rules run in priority order (highest first) whenever a transaction is imported or manually added.
             </p>
           </div>
@@ -77,7 +77,7 @@ export function Categories() {
         </div>
         <Card className="overflow-x-auto p-0">
           <table className="w-full min-w-[640px] text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-ink-muted dark:bg-white/5 dark:text-ink-muted">
               <tr>
                 <th className="px-4 py-2 font-medium">Pattern</th>
                 <th className="px-4 py-2 font-medium">Match</th>
@@ -88,16 +88,16 @@ export function Categories() {
                 <th className="px-4 py-2" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-hairline">
               {rules?.map((r) => (
                 <tr key={r.id}>
                   <td className="px-4 py-2 font-mono text-xs">{r.pattern}</td>
-                  <td className="px-4 py-2 text-xs text-slate-500">{r.matchType}</td>
-                  <td className="px-4 py-2 text-xs text-slate-500">{r.amountSign}</td>
+                  <td className="px-4 py-2 text-xs text-ink-muted">{r.matchType}</td>
+                  <td className="px-4 py-2 text-xs text-ink-muted">{r.amountSign}</td>
                   <td className="px-4 py-2">
                     <Badge color={r.category?.color}>{r.category?.name}</Badge>
                   </td>
-                  <td className="px-4 py-2 text-xs text-slate-500">{r.priority}</td>
+                  <td className="px-4 py-2 text-xs text-ink-muted">{r.priority}</td>
                   <td className="px-4 py-2">
                     <input
                       type="checkbox"
@@ -106,10 +106,10 @@ export function Categories() {
                     />
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <button className="mr-3 text-xs text-slate-400 hover:text-blue-500" onClick={() => setEditingRule(r)}>
+                    <button className="mr-3 text-xs text-ink-muted hover:text-brand" onClick={() => setEditingRule(r)}>
                       Edit
                     </button>
-                    <button className="text-xs text-slate-400 hover:text-red-500" onClick={() => deleteRule.mutate(r.id)}>
+                    <button className="text-xs text-ink-muted hover:text-critical" onClick={() => deleteRule.mutate(r.id)}>
                       Delete
                     </button>
                   </td>
@@ -117,7 +117,7 @@ export function Categories() {
               ))}
             </tbody>
           </table>
-          {(rules?.length ?? 0) === 0 && <p className="p-6 text-center text-sm text-slate-500">No rules yet.</p>}
+          {(rules?.length ?? 0) === 0 && <p className="p-6 text-center text-sm text-ink-muted">No rules yet.</p>}
         </Card>
       </div>
 
@@ -151,7 +151,7 @@ function AddCategoryModal({ onClose }: { onClose: () => void }) {
         </div>
         <div>
           <Label>Color</Label>
-          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-700" />
+          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-9 w-full rounded-lg border border-slate-300 dark:border-hairline-strong" />
         </div>
         <Button
           className="mt-2"
@@ -258,7 +258,7 @@ function EditCategoryModal({ category, onClose }: { category: Category; onClose:
             {category.type === "TRANSFER" && <option value="TRANSFER">Transfer</option>}
           </Select>
           {category.isSystem && (
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">System category type can't be changed.</p>
+            <p className="mt-1 text-xs text-ink-muted">System category type can't be changed.</p>
           )}
         </div>
         <div>
@@ -267,7 +267,7 @@ function EditCategoryModal({ category, onClose }: { category: Category; onClose:
             type="color"
             value={color}
             onChange={(e) => setColor(e.target.value)}
-            className="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-700"
+            className="h-9 w-full rounded-lg border border-slate-300 dark:border-hairline-strong"
           />
         </div>
         <Button

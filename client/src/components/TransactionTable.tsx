@@ -62,7 +62,7 @@ export function TransactionTable({
   }
 
   if (transactions.length === 0) {
-    return <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">No transactions found.</p>;
+    return <p className="py-8 text-center text-sm text-ink-muted">No transactions found.</p>;
   }
 
   return (
@@ -91,7 +91,7 @@ export function TransactionTable({
           scroll, so it's a separate layout rather than a CSS-only reshuffle. */}
       <div className="flex flex-col gap-2 sm:hidden">
         {transactions.map((t) => (
-          <div key={t.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+          <div key={t.id} className="rounded-xl border border-slate-200 p-3 dark:border-hairline">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2">
                 {!t.isTransfer && (
@@ -102,20 +102,20 @@ export function TransactionTable({
                     aria-label={`Select transaction ${t.description}`}
                   />
                 )}
-                <span className="text-xs text-slate-500 dark:text-slate-400">{formatDate(t.date)}</span>
+                <span className="text-xs text-ink-muted">{formatDate(t.date)}</span>
               </div>
               <span
                 className={`font-medium ${
-                  t.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-slate-700 dark:text-slate-200"
+                  t.amount >= 0 ? "text-good" : "text-ink-secondary"
                 }`}
               >
                 {formatMoney(t.amount, currency)}
               </span>
             </div>
 
-            <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">{t.description}</p>
+            <p className="mt-1 text-sm font-medium text-ink">{t.description}</p>
             {showAccountColumn && t.account && (
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t.account.name}</p>
+              <p className="text-xs text-ink-muted">{t.account.name}</p>
             )}
 
             <div className="mt-2 flex flex-col gap-2">
@@ -144,14 +144,14 @@ export function TransactionTable({
               )}
             </div>
 
-            {t.notes && <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t.notes}</p>}
+            {t.notes && <p className="mt-2 text-xs text-ink-muted">{t.notes}</p>}
             {runningBalances && runningBalances[t.id] != null && (
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-xs text-ink-muted">
                 Balance: {formatMoney(runningBalances[t.id], currency)}
               </p>
             )}
 
-            <div className="mt-2 flex justify-end gap-1 border-t border-slate-100 pt-2 dark:border-slate-800">
+            <div className="mt-2 flex justify-end gap-1 border-t border-slate-100 pt-2 dark:border-hairline">
               <Button variant="ghost" onClick={() => setEditing(t)}>
                 Edit
               </Button>
@@ -170,9 +170,9 @@ export function TransactionTable({
         ))}
       </div>
 
-      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 sm:block">
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 dark:border-hairline sm:block">
         <table className="w-full min-w-[900px] text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-ink-muted dark:bg-white/5 dark:text-ink-muted">
             <tr>
               <th className="w-10 px-4 py-2">
                 <input
@@ -194,9 +194,9 @@ export function TransactionTable({
               <th className="px-4 py-2 font-medium" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody className="divide-y divide-slate-100 dark:divide-hairline">
             {transactions.map((t) => (
-              <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <tr key={t.id} className="hover:bg-white/5">
                 <td className="px-4 py-2">
                   {!t.isTransfer && (
                     <input
@@ -207,14 +207,14 @@ export function TransactionTable({
                     />
                   )}
                 </td>
-                <td className="whitespace-nowrap px-4 py-2 text-slate-600 dark:text-slate-300">{formatDate(t.date)}</td>
-              <td className="max-w-xs px-4 py-2 text-slate-800 dark:text-slate-100">
+                <td className="whitespace-nowrap px-4 py-2 text-ink-secondary">{formatDate(t.date)}</td>
+              <td className="max-w-xs px-4 py-2 text-ink">
                 <div className="truncate" title={t.description}>
                   {t.description}
                 </div>
               </td>
               {showAccountColumn && (
-                <td className="whitespace-nowrap px-4 py-2 text-slate-600 dark:text-slate-300">{t.account?.name}</td>
+                <td className="whitespace-nowrap px-4 py-2 text-ink-secondary">{t.account?.name}</td>
               )}
               {groups && groups.length > 1 && (
                 <td className="px-4 py-2">
@@ -245,20 +245,20 @@ export function TransactionTable({
                   ))}
                 </Select>
               </td>
-              <td className="max-w-[12rem] px-4 py-2 text-slate-500 dark:text-slate-400">
+              <td className="max-w-[12rem] px-4 py-2 text-ink-muted">
                 <div className="truncate" title={t.notes ?? ""}>
                   {t.notes ?? "—"}
                 </div>
               </td>
               <td
                 className={`whitespace-nowrap px-4 py-2 text-right font-medium ${
-                  t.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-slate-700 dark:text-slate-200"
+                  t.amount >= 0 ? "text-good" : "text-ink-secondary"
                 }`}
               >
                 {formatMoney(t.amount, currency)}
               </td>
               {runningBalances && (
-                <td className="whitespace-nowrap px-4 py-2 text-right text-slate-600 dark:text-slate-300">
+                <td className="whitespace-nowrap px-4 py-2 text-right text-ink-secondary">
                   {runningBalances[t.id] != null ? formatMoney(runningBalances[t.id], currency) : "—"}
                 </td>
               )}
@@ -316,8 +316,8 @@ function BulkActionsBar({
   onDelete: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-900 dark:bg-blue-500/10">
-      <span className="font-medium text-slate-700 dark:text-slate-200">{count} selected</span>
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-brand/10 px-4 py-2 text-sm">
+      <span className="font-medium text-ink-secondary">{count} selected</span>
       <Select
         className="w-auto min-w-40"
         value=""
@@ -454,7 +454,7 @@ function EditTransactionModal({
         </div>
         {convertingToTransfer && (
           <>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-ink-muted">
               This will delete this transaction and record it as a transfer instead, with the account/group above as
               one leg.
             </p>
@@ -488,7 +488,7 @@ function EditTransactionModal({
                 </Select>
               </div>
             )}
-            {sameAccountAndGroup && <p className="text-xs text-red-500">Source and destination must be different.</p>}
+            {sameAccountAndGroup && <p className="text-xs text-critical">Source and destination must be different.</p>}
           </>
         )}
         <div>
@@ -531,7 +531,7 @@ function EditTransactionModal({
           {saving ? "Saving…" : convertingToTransfer ? "Convert to transfer" : "Save changes"}
         </Button>
         {(createTransfer.isError || deleteTransaction.isError) && (
-          <p className="text-xs text-red-500">{getErrorMessage(createTransfer.error ?? deleteTransaction.error)}</p>
+          <p className="text-xs text-critical">{getErrorMessage(createTransfer.error ?? deleteTransaction.error)}</p>
         )}
       </div>
     </Modal>

@@ -41,8 +41,8 @@ export function Transactions() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Transactions</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Search, filter, and edit every transaction across accounts.</p>
+          <h1 className="text-xl font-semibold text-ink">Transactions</h1>
+          <p className="text-sm text-ink-muted">Search, filter, and edit every transaction across accounts.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -120,7 +120,7 @@ export function Transactions() {
         </div>
       </Card>
 
-      {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
+      {isLoading && <p className="text-sm text-ink-muted">Loading…</p>}
       {data && (
         <>
           <TransactionTable
@@ -131,7 +131,7 @@ export function Transactions() {
             runningBalances={data.runningBalances}
             currency={selectedAccount?.currency}
           />
-          <div className="flex flex-col gap-2 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between">
             <span>
               {data.total} transaction(s) · page {page} of {totalPages}
             </span>

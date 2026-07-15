@@ -41,7 +41,7 @@ export function AddTransactionModal({
         <div>
           <Label>Account</Label>
           {defaultAccountId ? (
-            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200">
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-ink-secondary dark:border-hairline-strong dark:bg-white/5 dark:text-ink-secondary">
               {defaultAccount?.name}
             </p>
           ) : (
@@ -136,7 +136,7 @@ export function AddTransactionModal({
                 </Select>
               </div>
             )}
-            {sameAccountAndGroup && <p className="text-xs text-red-500">Source and destination must be different.</p>}
+            {sameAccountAndGroup && <p className="text-xs text-critical">Source and destination must be different.</p>}
           </>
         )}
         <Button
@@ -181,7 +181,7 @@ export function AddTransactionModal({
           {isTransferCategory ? "Add transfer" : "Add transaction"}
         </Button>
         {(createTransaction.isError || createTransfer.isError) && (
-          <p className="text-xs text-red-500">{getErrorMessage(createTransaction.error ?? createTransfer.error)}</p>
+          <p className="text-xs text-critical">{getErrorMessage(createTransaction.error ?? createTransfer.error)}</p>
         )}
       </div>
     </Modal>

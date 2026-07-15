@@ -18,13 +18,13 @@ export function Accounts() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Accounts</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Bank accounts and credit cards, including multi-purpose funds.</p>
+          <h1 className="text-xl font-semibold text-ink">Accounts</h1>
+          <p className="text-sm text-ink-muted">Bank accounts and credit cards, including multi-purpose funds.</p>
         </div>
         <Button onClick={() => setShowCreate(true)}>+ Add account</Button>
       </div>
 
-      {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
+      {isLoading && <p className="text-sm text-ink-muted">Loading…</p>}
       {!isLoading && accounts?.length === 0 && <EmptyState message="No accounts yet. Add your first bank account or credit card." />}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -34,10 +34,10 @@ export function Accounts() {
             <Card key={account.id} className="flex flex-col gap-3">
               <div className="flex items-start justify-between">
                 <div>
-                  <Link to={`/accounts/${account.id}`} className="font-semibold text-slate-900 hover:underline dark:text-white">
+                  <Link to={`/accounts/${account.id}`} className="font-semibold text-ink hover:underline dark:text-ink">
                     {account.name}
                   </Link>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-ink-muted">
                     {account.type === "BANK" ? "Bank account" : "Credit card"}
                     {account.institution ? ` · ${account.institution}` : ""}
                     {account.last4 ? ` · ••${account.last4}` : ""}
@@ -53,7 +53,7 @@ export function Accounts() {
                 </Button>
               </div>
 
-              <p className="text-2xl font-semibold text-slate-900 dark:text-white">
+              <p className="text-2xl font-semibold text-ink">
                 {formatMoney(balance?.balance ?? 0, account.currency)}
               </p>
 
@@ -70,7 +70,7 @@ export function Accounts() {
                 </div>
               )}
 
-              <Link to={`/accounts/${account.id}`} className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
+              <Link to={`/accounts/${account.id}`} className="text-sm font-medium text-brand hover:underline">
                 View transactions →
               </Link>
             </Card>

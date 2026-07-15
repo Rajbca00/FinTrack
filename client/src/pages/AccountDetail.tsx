@@ -40,17 +40,17 @@ export function AccountDetail() {
   const effectiveGroupId = activeGroupId ?? (account?.groups.length === 1 ? account.groups[0].id : undefined);
   const { data: txnData, isLoading } = useTransactions({ accountId: id, groupId: effectiveGroupId, pageSize: 100 });
 
-  if (!account) return <p className="text-sm text-slate-500">Loading account…</p>;
+  if (!account) return <p className="text-sm text-ink-muted">Loading account…</p>;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Link to="/accounts" className="text-xs text-slate-500 hover:underline dark:text-slate-400">
+          <Link to="/accounts" className="text-xs text-ink-muted hover:underline dark:text-ink-muted">
             ← All accounts
           </Link>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">{account.name}</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <h1 className="text-xl font-semibold text-ink">{account.name}</h1>
+          <p className="text-sm text-ink-muted">
             {account.type === "BANK" ? "Bank account" : "Credit card"}
             {account.institution ? ` · ${account.institution}` : ""}
             {account.last4 ? ` · ••${account.last4}` : ""}
@@ -72,10 +72,10 @@ export function AccountDetail() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Card>
-          <p className="text-xs font-medium uppercase text-slate-500">Total balance</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(balance?.balance ?? 0, account.currency)}</p>
+          <p className="text-xs font-medium uppercase text-ink-muted">Total balance</p>
+          <p className="mt-1 text-2xl font-semibold text-ink">{formatMoney(balance?.balance ?? 0, account.currency)}</p>
           {account.creditLimit != null && (
-            <p className="mt-1 text-xs text-slate-500">Credit limit {formatMoney(account.creditLimit, account.currency)}</p>
+            <p className="mt-1 text-xs text-ink-muted">Credit limit {formatMoney(account.creditLimit, account.currency)}</p>
           )}
         </Card>
 
@@ -86,12 +86,12 @@ export function AccountDetail() {
               <div className="flex items-center justify-between">
                 <Badge color={g.color}>{g.name}</Badge>
                 <div className="flex items-center gap-2">
-                  <button className="text-xs text-slate-400 hover:text-blue-500" onClick={() => setEditingGroup(g)}>
+                  <button className="text-xs text-ink-muted hover:text-brand" onClick={() => setEditingGroup(g)}>
                     Edit
                   </button>
                   {!g.isDefault && (
                     <button
-                      className="text-xs text-slate-400 hover:text-red-500"
+                      className="text-xs text-ink-muted hover:text-critical"
                       onClick={() => {
                         if (confirm(`Delete group "${g.name}"? It must have no transactions.`)) deleteGroup.mutate(g.id);
                       }}
@@ -101,8 +101,8 @@ export function AccountDetail() {
                   )}
                 </div>
               </div>
-              <p className="text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(gb?.balance ?? 0, account.currency)}</p>
-              <p className="text-xs text-slate-500">{gb?.transactionCount ?? 0} transactions</p>
+              <p className="text-xl font-semibold text-ink">{formatMoney(gb?.balance ?? 0, account.currency)}</p>
+              <p className="text-xs text-ink-muted">{gb?.transactionCount ?? 0} transactions</p>
             </Card>
           );
         })}
@@ -118,8 +118,8 @@ export function AccountDetail() {
       )}
 
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Transactions</h2>
-        {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
+        <h2 className="mb-2 text-sm font-semibold text-ink-secondary">Transactions</h2>
+        {isLoading && <p className="text-sm text-ink-muted">Loading…</p>}
         {!isLoading && txnData && (
           <TransactionTable
             transactions={txnData.transactions}
@@ -185,7 +185,7 @@ function EditAccountModal({ account, onClose }: { account: Account; onClose: () 
             </div>
           )}
         </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-ink-muted">
           To change a group's starting balance, name, or color, use "Edit" on that group's card instead.
         </p>
         <Button
@@ -233,7 +233,7 @@ function EditGroupModal({ group, onClose }: { group: Account["groups"][number]; 
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
-              className="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-700"
+              className="h-9 w-full rounded-lg border border-slate-300 dark:border-hairline-strong"
             />
           </div>
           <div>
@@ -264,9 +264,7 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
     <button
       onClick={onClick}
       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-        active
-          ? "border-blue-600 bg-blue-600 text-white"
-          : "border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+        active ? "border-brand bg-brand text-white" : "border-hairline-strong text-ink-secondary hover:bg-white/5"
       }`}
     >
       {label}
@@ -288,7 +286,7 @@ function AddGroupModal({
   return (
     <Modal title="Add a fund / purpose group" onClose={onClose}>
       <div className="flex flex-col gap-3">
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-ink-muted">
           Use groups to track money for a separate purpose inside this account, e.g. a temple fund alongside your personal
           funds. Move money between groups later using Transfers → Reallocation.
         </p>
@@ -299,7 +297,7 @@ function AddGroupModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Color</Label>
-            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-700" />
+            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-9 w-full rounded-lg border border-slate-300 dark:border-hairline-strong" />
           </div>
           <div>
             <Label>Starting balance (optional)</Label>
