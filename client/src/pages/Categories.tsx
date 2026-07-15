@@ -29,12 +29,14 @@ export function Categories() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Categories</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">Custom categories used to classify income and expenses.</p>
           </div>
-          <Button onClick={() => setShowAddCategory(true)}>+ Add category</Button>
+          <Button className="self-start sm:self-auto" onClick={() => setShowAddCategory(true)}>
+            + Add category
+          </Button>
         </div>
         <Card>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -59,22 +61,22 @@ export function Categories() {
       </div>
 
       <div>
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Auto-categorization rules</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Rules run in priority order (highest first) whenever a transaction is imported or manually added.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => applyRules.mutate({ overwrite: false })} disabled={applyRules.isPending}>
               Apply to uncategorized
             </Button>
             <Button onClick={() => setShowAddRule(true)}>+ Add rule</Button>
           </div>
         </div>
-        <Card className="p-0">
-          <table className="w-full text-sm">
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-2 font-medium">Pattern</th>

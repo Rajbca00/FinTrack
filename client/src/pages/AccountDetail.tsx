@@ -44,7 +44,7 @@ export function AccountDetail() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link to="/accounts" className="text-xs text-slate-500 hover:underline dark:text-slate-400">
             ← All accounts
@@ -56,7 +56,7 @@ export function AccountDetail() {
             {account.last4 ? ` · ••${account.last4}` : ""}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => setShowEditAccount(true)}>
             Edit account
           </Button>
