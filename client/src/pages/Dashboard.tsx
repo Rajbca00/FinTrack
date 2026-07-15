@@ -14,14 +14,13 @@ import {
 import { useAccounts, useBalances, useBreakdown, useCategoryTrend, useTrend } from "../hooks/useApi";
 import { Card, Select, Label } from "../components/ui";
 import { formatMoney } from "../lib/format";
-import { CHROME, DIVERGING, categoricalColor, useIsDarkMode } from "../lib/palette";
+import { CHROME, DIVERGING, categoricalColor } from "../lib/palette";
 
 type Period = "week" | "month" | "year";
 
 export function Dashboard() {
-  const dark = useIsDarkMode();
-  const chrome = dark ? CHROME.dark : CHROME.light;
-  const diverging = dark ? DIVERGING.dark : DIVERGING.light;
+  const chrome = CHROME;
+  const diverging = DIVERGING.dark;
 
   const { data: accounts } = useAccounts();
   const { data: balances } = useBalances();
@@ -147,16 +146,16 @@ export function Dashboard() {
     const top = breakdown.slice(0, 8);
     const rest = breakdown.slice(8);
     const otherTotal = rest.reduce((s, b) => s + b.total, 0);
-    const items = top.map((b, i) => ({ ...b, color: categoricalColor(i, dark) }));
+    const items = top.map((b, i) => ({ ...b, color: categoricalColor(i) }));
     if (otherTotal > 0) items.push({ categoryId: "other", name: "Other", color: chrome.mutedInk, total: otherTotal });
     return items;
-  }, [breakdown, dark, chrome.mutedInk]);
+  }, [breakdown, chrome.mutedInk]);
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Dashboard</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">An overview of your money across accounts and funds.</p>
+        <h1 className="text-xl font-semibold text-ink">Dashboard</h1>
+        <p className="text-sm text-ink-muted">An overview of your money across accounts and funds.</p>
       </div>
 
       <Card className="flex flex-wrap items-end gap-4">
@@ -220,23 +219,23 @@ export function Dashboard() {
       </div>
 
       <Card>
-        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-200">Income vs expense</h2>
+        <h2 className="mb-4 text-sm font-semibold text-ink-secondary">Income vs expense</h2>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={trend ?? []} barCategoryGap="24%">
             <CartesianGrid vertical={false} stroke={chrome.gridline} />
             <XAxis dataKey="label" tick={{ fill: chrome.mutedInk, fontSize: 12 }} axisLine={{ stroke: chrome.baseline }} tickLine={false} />
             <YAxis tick={{ fill: chrome.mutedInk, fontSize: 12 }} axisLine={false} tickLine={false} width={80} tickFormatter={(v) => formatMoney(v)} />
-            <Tooltip content={<ChartTooltip currency="INR" />} cursor={{ fill: dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)" }} />
+            <Tooltip content={<ChartTooltip currency="INR" />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
             <Legend wrapperStyle={{ fontSize: 12, color: chrome.secondaryInk }} />
             <Bar dataKey="income" name="Income" fill={diverging.positive} radius={[4, 4, 0, 0]} maxBarSize={40} />
             <Bar dataKey="expense" name="Expense" fill={diverging.negative} radius={[4, 4, 0, 0]} maxBarSize={40} />
           </BarChart>
         </ResponsiveContainer>
-        {(trend?.length ?? 0) === 0 && <p className="py-6 text-center text-sm text-slate-500">No transactions in range yet.</p>}
+        {(trend?.length ?? 0) === 0 && <p className="py-6 text-center text-sm text-ink-muted">No transactions in range yet.</p>}
       </Card>
 
       <Card>
-        <h2 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-200">
+        <h2 className="mb-4 text-sm font-semibold text-ink-secondary">
           Spending by category{selectedMonth ? ` — ${currentPeriod?.label ?? ""}` : ""}
         </h2>
         <ResponsiveContainer width="100%" height={Math.max(120, breakdownWithOther.length * 36)}>
@@ -244,7 +243,7 @@ export function Dashboard() {
             <CartesianGrid horizontal={false} stroke={chrome.gridline} />
             <XAxis type="number" tick={{ fill: chrome.mutedInk, fontSize: 12 }} axisLine={{ stroke: chrome.baseline }} tickLine={false} tickFormatter={(v) => formatMoney(v)} />
             <YAxis type="category" dataKey="name" tick={{ fill: chrome.secondaryInk, fontSize: 12 }} axisLine={false} tickLine={false} width={140} />
-            <Tooltip content={<ChartTooltip currency="INR" />} cursor={{ fill: dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)" }} />
+            <Tooltip content={<ChartTooltip currency="INR" />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
             <Bar dataKey="total" name="Spent" radius={[0, 4, 4, 0]} maxBarSize={22}>
               {breakdownWithOther.map((entry) => (
                 <Cell key={entry.categoryId} fill={entry.color} />
@@ -252,12 +251,12 @@ export function Dashboard() {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-        {breakdownWithOther.length === 0 && <p className="py-6 text-center text-sm text-slate-500">No expenses in range yet.</p>}
+        {breakdownWithOther.length === 0 && <p className="py-6 text-center text-sm text-ink-muted">No expenses in range yet.</p>}
       </Card>
 
       <Card>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Category spend by month</h2>
+          <h2 className="text-sm font-semibold text-ink-secondary">Category spend by month</h2>
           <Select
             className="w-auto"
             value={categoryTrendPreset}
@@ -272,7 +271,7 @@ export function Dashboard() {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-ink-muted dark:bg-white/5 dark:text-ink-muted">
               <tr>
                 <th className="whitespace-nowrap px-3 py-2 font-medium">Category</th>
                 {categoryTrend?.months.map((m) => (
@@ -283,21 +282,21 @@ export function Dashboard() {
                 <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Total</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-hairline">
               {categoryTrend?.rows.map((r) => (
                 <tr key={r.categoryId}>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-800 dark:text-slate-100">
+                  <td className="whitespace-nowrap px-3 py-2 text-ink">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full" style={{ background: r.color ?? "#94a3b8" }} />
                       {r.name}
                     </span>
                   </td>
                   {r.totals.map((v, i) => (
-                    <td key={categoryTrend.months[i].key} className="whitespace-nowrap px-3 py-2 text-right text-slate-600 dark:text-slate-300">
+                    <td key={categoryTrend.months[i].key} className="whitespace-nowrap px-3 py-2 text-right text-ink-secondary">
                       {v > 0 ? formatMoney(v) : "—"}
                     </td>
                   ))}
-                  <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-slate-900 dark:text-white">
+                  <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-ink">
                     {formatMoney(r.total)}
                   </td>
                 </tr>
@@ -305,7 +304,7 @@ export function Dashboard() {
             </tbody>
             {categoryTrend && categoryTrend.months.length > 0 && (
               <tfoot>
-                <tr className="border-t border-slate-200 font-semibold dark:border-slate-800">
+                <tr className="border-t border-slate-200 font-semibold dark:border-hairline">
                   <td className="whitespace-nowrap px-3 py-2">Total</td>
                   {categoryTrend.months.map((m, i) => (
                     <td key={m.key} className="whitespace-nowrap px-3 py-2 text-right">
@@ -320,13 +319,13 @@ export function Dashboard() {
             )}
           </table>
         </div>
-        {(categoryTrend?.rows.length ?? 0) === 0 && <p className="py-6 text-center text-sm text-slate-500">No expenses in range yet.</p>}
+        {(categoryTrend?.rows.length ?? 0) === 0 && <p className="py-6 text-center text-sm text-ink-muted">No expenses in range yet.</p>}
       </Card>
 
       {fundsAcrossAccounts.length > 0 && (
         <div>
-          <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Funds across accounts</h2>
-          <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+          <h2 className="mb-2 text-sm font-semibold text-ink-secondary">Funds across accounts</h2>
+          <p className="mb-2 text-xs text-ink-muted">
             Groups that share a name in more than one account, combined here for reference. Each is still a separate
             group with its own balance - use Transfers → Reallocate to move money between them within an account.
           </p>
@@ -335,12 +334,12 @@ export function Dashboard() {
               <Card key={f.name}>
                 <div className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full" style={{ background: f.color ?? "#94a3b8" }} />
-                  <p className="font-medium text-slate-900 dark:text-white">{f.name}</p>
+                  <p className="font-medium text-ink">{f.name}</p>
                 </div>
-                <p className="text-xl font-semibold text-slate-900 dark:text-white">
+                <p className="text-xl font-semibold text-ink">
                   {f.currency ? formatMoney(f.total, f.currency) : "Mixed currencies"}
                 </p>
-                <ul className="mt-2 flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <ul className="mt-2 flex flex-col gap-1 text-xs text-ink-muted">
                   {f.accounts.map((a) => (
                     <li key={a.name} className="flex items-center justify-between">
                       <span>{a.name}</span>
@@ -355,14 +354,14 @@ export function Dashboard() {
       )}
 
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Balances by account & group</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink-secondary">Balances by account & group</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {balances?.map((a) => (
             <Card key={a.id}>
-              <p className="font-medium text-slate-900 dark:text-white">{a.name}</p>
-              <p className="text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(a.balance, a.currency)}</p>
+              <p className="font-medium text-ink">{a.name}</p>
+              <p className="text-xl font-semibold text-ink">{formatMoney(a.balance, a.currency)}</p>
               {a.groups.length > 1 && (
-                <ul className="mt-2 flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <ul className="mt-2 flex flex-col gap-1 text-xs text-ink-muted">
                   {a.groups.map((g) => (
                     <li key={g.id} className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
@@ -383,10 +382,10 @@ export function Dashboard() {
 }
 
 function StatCard({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
-  const toneClass = tone === "good" ? "text-green-600 dark:text-green-400" : tone === "bad" ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white";
+  const toneClass = tone === "good" ? "text-good" : tone === "bad" ? "text-critical" : "text-ink";
   return (
     <Card>
-      <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
+      <p className="text-xs font-medium uppercase text-ink-muted">{label}</p>
       <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>
     </Card>
   );
@@ -395,13 +394,13 @@ function StatCard({ label, value, tone }: { label: string; value: string; tone?:
 function ChartTooltip({ active, payload, label, currency }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string; currency: string }) {
   if (!active || !payload || payload.length === 0) return null;
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-900">
-      {label && <p className="mb-1 font-medium text-slate-700 dark:text-slate-200">{label}</p>}
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-hairline-strong dark:bg-surface">
+      {label && <p className="mb-1 font-medium text-ink-secondary">{label}</p>}
       {payload.map((p) => (
-        <div key={p.name} className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+        <div key={p.name} className="flex items-center gap-2 text-ink-secondary">
           <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
           <span>{p.name}:</span>
-          <span className="font-medium text-slate-900 dark:text-white">{formatMoney(p.value, currency)}</span>
+          <span className="font-medium text-ink">{formatMoney(p.value, currency)}</span>
         </div>
       ))}
     </div>

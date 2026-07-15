@@ -28,39 +28,19 @@ export const DIVERGING = {
   dark: { positive: "#3987e5", negative: "#e66767", mid: "#383835" },
 };
 
+// The app renders one signature dark theme regardless of OS preference (see
+// index.css / index.html), so only the dark chrome values are used - the
+// light ones above stay only as the source-of-truth reference from the
+// dataviz skill's validated palette, in case a light mode is ever added back.
 export const CHROME = {
-  light: {
-    surface: "#fcfcfb",
-    primaryInk: "#0b0b0b",
-    secondaryInk: "#52514e",
-    mutedInk: "#898781",
-    gridline: "#e1e0d9",
-    baseline: "#c3c2b7",
-  },
-  dark: {
-    surface: "#1a1a19",
-    primaryInk: "#ffffff",
-    secondaryInk: "#c3c2b7",
-    mutedInk: "#898781",
-    gridline: "#2c2c2a",
-    baseline: "#383835",
-  },
+  surface: "#1a1a19",
+  primaryInk: "#ffffff",
+  secondaryInk: "#c3c2b7",
+  mutedInk: "#898781",
+  gridline: "#2c2c2a",
+  baseline: "#383835",
 };
 
-import { useEffect, useState } from "react";
-
-export function useIsDarkMode(): boolean {
-  const [dark, setDark] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-color-scheme: dark)");
-    const listener = (e: MediaQueryListEvent) => setDark(e.matches);
-    mql.addEventListener("change", listener);
-    return () => mql.removeEventListener("change", listener);
-  }, []);
-  return dark;
-}
-
-export function categoricalColor(index: number, dark: boolean): string {
-  const arr = dark ? CATEGORICAL_DARK : CATEGORICAL_LIGHT;
-  return arr[index % arr.length];
+export function categoricalColor(index: number): string {
+  return CATEGORICAL_DARK[index % CATEGORICAL_DARK.length];
 }

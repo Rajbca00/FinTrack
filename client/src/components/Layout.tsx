@@ -3,22 +3,19 @@ import { NavLink, Outlet } from "react-router-dom";
 import clsx from "clsx";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", end: true, icon: IconHome },
-  { to: "/accounts", label: "Accounts", icon: IconBank },
-  { to: "/transactions", label: "Transactions", icon: IconList },
-  { to: "/transfers", label: "Transfers", icon: IconSwap },
-  { to: "/categories", label: "Categories & Rules", icon: IconTag },
+  { to: "/", label: "Dashboard", tabLabel: "Home", end: true, icon: IconHome },
+  { to: "/accounts", label: "Accounts", tabLabel: "Accounts", icon: IconBank },
+  { to: "/transactions", label: "Transactions", tabLabel: "Activity", icon: IconList },
+  { to: "/transfers", label: "Transfers", tabLabel: "Transfers", icon: IconSwap },
+  { to: "/categories", label: "Categories & Rules", tabLabel: "Categories", icon: IconTag },
 ];
 
 const STORAGE_KEY = "fintrack.sidebarCollapsed";
 
 export function Layout() {
-  // Desktop-only icon-rail collapse (persisted). Independent from the
-  // mobile drawer below - collapsing never applies under `md`, since the
-  // drawer is fully hidden/shown instead of narrowed there.
+  // Icon-rail collapse, desktop only - the mobile bottom tab bar replaces
+  // the sidebar entirely below md, so collapsing has nothing to do there.
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(STORAGE_KEY) === "1");
-  // Mobile-only off-canvas drawer state. Not persisted - always starts closed.
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, collapsed ? "1" : "0");
@@ -26,51 +23,26 @@ export function Layout() {
 
   return (
     <div className="min-h-screen md:flex">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 md:hidden">
-        <button
-          onClick={() => setMobileOpen(true)}
-          aria-label="Open menu"
-          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
-          <IconMenu className="h-6 w-6" />
-        </button>
-        <h1 className="text-base font-semibold text-slate-900 dark:text-white">FinTrack</h1>
-        <span className="w-9" />
-      </div>
-
-      {mobileOpen && (
-        <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)} />
-      )}
-
       <aside
         className={clsx(
-          "fixed inset-y-0 left-0 z-40 w-64 -translate-x-full border-r border-slate-200 bg-white px-4 py-6 transition-transform duration-200 dark:border-slate-800 dark:bg-slate-900",
-          "md:static md:translate-x-0 md:shrink-0 md:transition-[width]",
-          mobileOpen && "translate-x-0",
+          "sticky top-0 hidden h-screen shrink-0 border-r border-hairline bg-surface py-6 md:flex md:flex-col",
           collapsed ? "md:w-16 md:px-2" : "md:w-60 md:px-4"
         )}
       >
-        <div className={clsx("mb-8 flex items-center", collapsed ? "justify-center px-0 md:justify-center" : "justify-between px-2")}>
+        <div className={clsx("mb-8 flex items-center", collapsed ? "justify-center px-0" : "justify-between px-2")}>
           {!collapsed && (
             <div>
-              <h1 className="text-lg font-semibold text-slate-900 dark:text-white">FinTrack</h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Personal finance manager</p>
+              <h1 className="text-lg font-semibold tracking-tight text-ink">FinTrack</h1>
+              <p className="text-xs text-ink-muted">Personal finance manager</p>
             </div>
           )}
           <button
             onClick={() => setCollapsed((c) => !c)}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="hidden rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 md:inline-flex"
+            className="rounded-lg p-1.5 text-ink-muted hover:bg-white/5 hover:text-ink"
           >
             <IconChevron collapsed={collapsed} />
-          </button>
-          <button
-            onClick={() => setMobileOpen(false)}
-            aria-label="Close menu"
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 md:hidden"
-          >
-            <IconClose className="h-5 w-5" />
           </button>
         </div>
         <nav className="flex flex-col gap-1">
@@ -80,47 +52,51 @@ export function Layout() {
               to={item.to}
               end={item.end}
               title={collapsed ? item.label : undefined}
-              onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 clsx(
                   "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                  collapsed && "md:justify-center md:px-0",
-                  isActive
-                    ? "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"
-                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                  collapsed && "justify-center px-0",
+                  isActive ? "bg-brand/15 text-brand" : "text-ink-secondary hover:bg-white/5 hover:text-ink"
                 )
               }
             >
               <item.icon className="h-5 w-5 shrink-0" />
-              <span className={collapsed ? "md:hidden" : undefined}>{item.label}</span>
+              {!collapsed && <span>{item.label}</span>}
             </NavLink>
           ))}
         </nav>
       </aside>
-      <main className="flex-1 overflow-x-hidden px-4 py-6 md:px-8">
+
+      <main className="flex-1 overflow-x-hidden px-4 pb-24 pt-6 md:px-8 md:pb-6">
         <Outlet />
       </main>
+
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-hairline bg-surface/95 backdrop-blur md:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        {NAV_ITEMS.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) =>
+              clsx(
+                "flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium",
+                isActive ? "text-brand" : "text-ink-muted"
+              )
+            }
+          >
+            <item.icon className="h-5 w-5" />
+            <span>{item.tabLabel}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 }
 
 type IconProps = { className?: string };
-
-function IconMenu({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  );
-}
-
-function IconClose({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-    </svg>
-  );
-}
 
 function IconChevron({ collapsed, className }: IconProps & { collapsed: boolean }) {
   return (

@@ -95,7 +95,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
     <Modal title="Import statement" onClose={onClose} wide>
       {mode === "select" && (
         <div className="flex flex-col items-center gap-4 py-8 text-center">
-          <p className="text-sm text-slate-600 dark:text-slate-300">
+          <p className="text-sm text-ink-secondary">
             Upload a CSV export of your bank or credit card statement. Works with common formats (Date/Narration/Debit/Credit,
             or Date/Description/Amount).
           </p>
@@ -109,18 +109,18 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
           <Button onClick={() => fileInputRef.current?.click()} disabled={loading}>
             {loading ? "Reading file…" : "Choose CSV file"}
           </Button>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-critical">{error}</p>}
         </div>
       )}
 
       {mode === "map" && preview && (
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-ink-muted">
             {preview.rowCount} row(s) detected in {filename}. Confirm the column mapping below.
           </p>
 
           {usingSavedMapping ? (
-            <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+            <div className="flex items-center justify-between rounded-lg bg-brand/10 px-3 py-2 text-xs text-brand">
               <span>Using the mapping you last used for this account.</span>
               <button
                 className="font-medium underline"
@@ -133,10 +133,10 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
               </button>
             </div>
           ) : preview.savedMapping ? (
-            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs text-ink-muted dark:bg-white/5 dark:text-ink-muted">
               <span>Using auto-detected columns.</span>
               <button
-                className="font-medium text-blue-600 underline dark:text-blue-400"
+                className="font-medium text-brand underline"
                 onClick={() => {
                   applyMapping(preview.savedMapping!);
                   setUsingSavedMapping(true);
@@ -228,17 +228,17 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
             </Select>
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <label className="flex items-center gap-2 text-sm text-ink-secondary">
             <input type="checkbox" checked={applyRules} onChange={(e) => setApplyRules(e.target.checked)} />
             Auto-categorize using my rules
           </label>
 
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-hairline">
             <table className="w-full text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/50">
+              <thead className="bg-slate-50 dark:bg-white/5">
                 <tr>
                   {preview.headers.map((h) => (
-                    <th key={h} className="px-2 py-1 text-left font-medium text-slate-500">
+                    <th key={h} className="px-2 py-1 text-left font-medium text-ink-muted">
                       {h}
                     </th>
                   ))}
@@ -246,9 +246,9 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
               </thead>
               <tbody>
                 {preview.sampleRows.map((row, i) => (
-                  <tr key={i} className="border-t border-slate-100 dark:border-slate-800">
+                  <tr key={i} className="border-t border-slate-100 dark:border-hairline">
                     {preview.headers.map((h) => (
-                      <td key={h} className="px-2 py-1 text-slate-600 dark:text-slate-300">
+                      <td key={h} className="px-2 py-1 text-ink-secondary">
                         {row[h]}
                       </td>
                     ))}
@@ -258,7 +258,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
             </table>
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-critical">{error}</p>}
 
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setMode("select")}>
@@ -273,8 +273,8 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
 
       {mode === "done" && result && (
         <div className="flex flex-col items-center gap-3 py-6 text-center">
-          <p className="text-lg font-semibold text-slate-900 dark:text-white">Import complete</p>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
+          <p className="text-lg font-semibold text-ink">Import complete</p>
+          <p className="text-sm text-ink-secondary">
             Added {result.created} new transaction(s). Skipped {result.skipped} duplicate(s) out of {result.total} rows.
           </p>
           <Button onClick={onClose}>Done</Button>

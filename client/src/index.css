@@ -1,13 +1,45 @@
 @import "tailwindcss";
 
-:root {
-  color-scheme: light dark;
+/* The app ships one signature dark theme rather than following the OS
+   light/dark preference, so `dark:` is driven by the `.dark` class on
+   <html> (set permanently in index.html) instead of prefers-color-scheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Semantic tokens for the dark theme, sourced from the dataviz skill's
+   validated dark chart-chrome/ink values (see client/src/lib/palette.ts)
+   so the UI chrome and the chart panels read as one consistent surface
+   instead of two mismatched dark grays. Brand accent reuses the same blue
+   already used for "income" in charts, rather than inventing an
+   unvalidated new hue. */
+@theme {
+  --color-page: #0d0d0d;
+  --color-surface: #1a1a19;
+  --color-surface-hover: rgba(255, 255, 255, 0.06);
+  --color-hairline: rgba(255, 255, 255, 0.1);
+  --color-hairline-strong: rgba(255, 255, 255, 0.16);
+  --color-ink: #ffffff;
+  --color-ink-secondary: #c3c2b7;
+  --color-ink-muted: #898781;
+  --color-brand: #3987e5;
+  --color-brand-hover: #5a9dec;
+  --color-good: #0ca30c;
+  --color-critical: #d03b3b;
 }
 
-html, body, #root {
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
   height: 100%;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
+  @apply bg-page text-ink;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-brand) 35%, transparent);
 }
