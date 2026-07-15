@@ -9,3 +9,11 @@ export function formatDate(iso: string): string {
 export function toDateInputValue(iso: string): string {
   return iso.slice(0, 10);
 }
+
+// Group names like "General" repeat once per account by design, so any
+// dropdown that lists groups spanning more than one account needs the
+// account name to disambiguate them. Groups scoped to a single
+// already-selected account (no accountName attached) render unprefixed.
+export function groupDisplayName(group: { name: string; accountName?: string }): string {
+  return group.accountName ? `${group.accountName} - ${group.name}` : group.name;
+}

@@ -11,7 +11,13 @@ import {
   useBulkDeleteTransactions,
 } from "../hooks/useApi";
 import { Button, Modal, Input, Select, Label } from "./ui";
-import { formatDate, formatMoney, toDateInputValue } from "../lib/format";
+import { formatDate, formatMoney, groupDisplayName, toDateInputValue } from "../lib/format";
+
+// The group dropdowns below need to disambiguate group names that repeat
+// once per account (e.g. every account has a "General" group) - callers that
+// span more than one account (Transactions.tsx) attach accountName; callers
+// scoped to a single account (AccountDetail.tsx) don't need to.
+type GroupOption = Group & { accountName?: string };
 
 export function TransactionTable({
   transactions,
@@ -23,7 +29,7 @@ export function TransactionTable({
 }: {
   transactions: Transaction[];
   categories: Category[];
-  groups?: Group[];
+  groups?: GroupOption[];
   showAccountColumn?: boolean;
   // Only meaningful (and only passed by callers) when the list is scoped to
   // a single group - see the server's /transactions handler for why.
@@ -89,85 +95,99 @@ export function TransactionTable({
           columns (checkbox, date, description, category, group, balance,
           actions) to reflow sensibly at that width, even with horizontal
           scroll, so it's a separate layout rather than a CSS-only reshuffle. */}
-      <div className="flex flex-col gap-2 sm:hidden">
-        {transactions.map((t) => (
-          <div key={t.id} className="rounded-xl border border-slate-200 p-3 dark:border-hairline">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2.5 sm:hidden">
+        {transactions.map((t) => {
+          const categoryColor = t.category?.color ?? "#898781";
+          const categoryInitial = (t.category?.name ?? "?").slice(0, 1).toUpperCase();
+          return (
+            <div key={t.id} className="rounded-2xl border border-hairline bg-surface p-3.5">
+              <div className="flex items-center gap-3">
                 {!t.isTransfer && (
                   <input
                     type="checkbox"
                     checked={selectedIds.has(t.id)}
                     onChange={() => toggleOne(t.id)}
                     aria-label={`Select transaction ${t.description}`}
+                    className="shrink-0"
                   />
                 )}
-                <span className="text-xs text-ink-muted">{formatDate(t.date)}</span>
-              </div>
-              <span
-                className={`font-medium ${
-                  t.amount >= 0 ? "text-good" : "text-ink-secondary"
-                }`}
-              >
-                {formatMoney(t.amount, currency)}
-              </span>
-            </div>
-
-            <p className="mt-1 text-sm font-medium text-ink">{t.description}</p>
-            {showAccountColumn && t.account && (
-              <p className="text-xs text-ink-muted">{t.account.name}</p>
-            )}
-
-            <div className="mt-2 flex flex-col gap-2">
-              <Select
-                value={t.categoryId ?? ""}
-                onChange={(e) => updateTransaction.mutate({ id: t.id, data: { categoryId: e.target.value || null } })}
-              >
-                <option value="">Uncategorized</option>
-                {assignableCategories(categories).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
-              {groups && groups.length > 1 && (
-                <Select
-                  value={t.groupId}
-                  onChange={(e) => updateTransaction.mutate({ id: t.id, data: { groupId: e.target.value } })}
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+                  style={{ background: `${categoryColor}26`, color: categoryColor }}
                 >
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
+                  {categoryInitial}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="truncate text-sm font-semibold text-ink">{t.description}</p>
+                    <span
+                      className={`shrink-0 text-sm font-semibold ${t.amount >= 0 ? "text-good" : "text-ink-secondary"}`}
+                    >
+                      {formatMoney(t.amount, currency)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-ink-muted">
+                    {formatDate(t.date)}
+                    {showAccountColumn && t.account ? ` · ${t.account.name}` : ""}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <Select
+                  value={t.categoryId ?? ""}
+                  onChange={(e) => updateTransaction.mutate({ id: t.id, data: { categoryId: e.target.value || null } })}
+                  className="w-auto rounded-full border-hairline-strong bg-white/5 py-1 pl-2.5 text-xs"
+                >
+                  <option value="">Uncategorized</option>
+                  {assignableCategories(categories).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
                     </option>
                   ))}
                 </Select>
-              )}
-            </div>
+                {groups && groups.length > 1 && (
+                  <Select
+                    value={t.groupId}
+                    onChange={(e) => updateTransaction.mutate({ id: t.id, data: { groupId: e.target.value } })}
+                    className="w-auto rounded-full border-hairline-strong bg-white/5 py-1 pl-2.5 text-xs"
+                  >
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {groupDisplayName(g)}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </div>
 
-            {t.notes && <p className="mt-2 text-xs text-ink-muted">{t.notes}</p>}
-            {runningBalances && runningBalances[t.id] != null && (
-              <p className="mt-1 text-xs text-ink-muted">
-                Balance: {formatMoney(runningBalances[t.id], currency)}
-              </p>
-            )}
-
-            <div className="mt-2 flex justify-end gap-1 border-t border-slate-100 pt-2 dark:border-hairline">
-              <Button variant="ghost" onClick={() => setEditing(t)}>
-                Edit
-              </Button>
-              {!t.isTransfer && (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    if (confirm("Delete this transaction?")) deleteTransaction.mutate(t.id);
-                  }}
-                >
-                  Delete
-                </Button>
+              {(t.notes || (runningBalances && runningBalances[t.id] != null)) && (
+                <div className="mt-2 flex items-center justify-between gap-2 text-xs text-ink-muted">
+                  <span className="truncate">{t.notes}</span>
+                  {runningBalances && runningBalances[t.id] != null && (
+                    <span className="shrink-0">Balance: {formatMoney(runningBalances[t.id], currency)}</span>
+                  )}
+                </div>
               )}
+
+              <div className="mt-3 flex items-center justify-end gap-4 border-t border-hairline pt-2.5 text-xs font-medium">
+                <button className="text-ink-muted hover:text-brand" onClick={() => setEditing(t)}>
+                  Edit
+                </button>
+                {!t.isTransfer && (
+                  <button
+                    className="text-ink-muted hover:text-critical"
+                    onClick={() => {
+                      if (confirm("Delete this transaction?")) deleteTransaction.mutate(t.id);
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="hidden overflow-x-auto rounded-xl border border-slate-200 dark:border-hairline sm:block">
@@ -225,7 +245,7 @@ export function TransactionTable({
                   >
                     {groups.map((g) => (
                       <option key={g.id} value={g.id}>
-                        {g.name}
+                        {groupDisplayName(g)}
                       </option>
                     ))}
                   </Select>
@@ -309,7 +329,7 @@ function BulkActionsBar({
 }: {
   count: number;
   categories: Category[];
-  groups?: Group[];
+  groups?: GroupOption[];
   onClear: () => void;
   onCategorize: (categoryId: string) => void;
   onMoveGroup: (groupId: string) => void;
@@ -343,7 +363,7 @@ function BulkActionsBar({
           <option value="">Move to group…</option>
           {groups.map((g) => (
             <option key={g.id} value={g.id}>
-              {g.name}
+              {groupDisplayName(g)}
             </option>
           ))}
         </Select>

@@ -4,6 +4,7 @@ import { TransactionTable } from "../components/TransactionTable";
 import { AddTransactionModal } from "../components/AddTransactionModal";
 import { Card, Button, Select, Input, Label } from "../components/ui";
 import { assignableCategories } from "../lib/api";
+import { groupDisplayName } from "../lib/format";
 
 export function Transactions() {
   const { data: accounts } = useAccounts();
@@ -35,7 +36,10 @@ export function Transactions() {
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
-  const allGroups = useMemo(() => accounts?.flatMap((a) => a.groups) ?? [], [accounts]);
+  const allGroups = useMemo(
+    () => accounts?.flatMap((a) => a.groups.map((g) => ({ ...g, accountName: a.name }))) ?? [],
+    [accounts]
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -81,7 +85,7 @@ export function Transactions() {
             <option value="">All groups</option>
             {(selectedAccount ? selectedAccount.groups : allGroups).map((g) => (
               <option key={g.id} value={g.id}>
-                {g.name}
+                {groupDisplayName(g)}
               </option>
             ))}
           </Select>
