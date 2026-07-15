@@ -122,12 +122,40 @@ export function detectDateFormat(values: string[]): DateFormat {
   return "DMY";
 }
 
-export function normalizeRows(rows: Record<string, string>[], mapping: ColumnMapping): NormalizedRow[] {
+export type InvalidRow = {
+  rowIndex: number; // 0-based position in the CSV's data rows
+  reason: "invalid_date" | "missing_description";
+  dateRaw: string;
+  descriptionRaw: string;
+};
+
+export type NormalizeResult = {
+  rows: NormalizedRow[];
+  invalid: InvalidRow[];
+};
+
+// Rows with an unparseable date or an empty description can't become a
+// transaction, but silently dropping them with no trace is exactly what
+// makes an importer feel untrustworthy for financial data - every caller
+// needs to be able to tell the user "N detected, M skipped, here's why"
+// instead of just an unexplained gap between the two counts.
+export function normalizeRows(rows: Record<string, string>[], mapping: ColumnMapping): NormalizeResult {
   const out: NormalizedRow[] = [];
-  for (const row of rows) {
-    const dateISO = parseDate(row[mapping.dateColumn] ?? "", mapping.dateFormat);
-    const description = (row[mapping.descriptionColumn] ?? "").trim();
-    if (!dateISO || !description) continue;
+  const invalid: InvalidRow[] = [];
+  rows.forEach((row, rowIndex) => {
+    const dateRaw = row[mapping.dateColumn] ?? "";
+    const descriptionRaw = row[mapping.descriptionColumn] ?? "";
+    const dateISO = parseDate(dateRaw, mapping.dateFormat);
+    const description = descriptionRaw.trim();
+
+    if (!dateISO) {
+      invalid.push({ rowIndex, reason: "invalid_date", dateRaw, descriptionRaw });
+      return;
+    }
+    if (!description) {
+      invalid.push({ rowIndex, reason: "missing_description", dateRaw, descriptionRaw });
+      return;
+    }
 
     let amount: number;
     if (mapping.amountColumn) {
@@ -139,6 +167,6 @@ export function normalizeRows(rows: Record<string, string>[], mapping: ColumnMap
       amount = credit - Math.abs(debit);
     }
     out.push({ dateISO, description, amount });
-  }
-  return out;
+  });
+  return { rows: out, invalid };
 }

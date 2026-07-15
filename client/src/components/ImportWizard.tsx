@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Modal, Button, Select, Label } from "./ui";
-import { previewImport, confirmImport, type ColumnMapping, type DateFormat, type ImportPreview } from "../lib/api";
-import type { Group } from "../lib/api";
+import { previewImport, confirmImport, getErrorMessage, type ColumnMapping, type DateFormat, type ImportPreview } from "../lib/api";
+import type { Group, InvalidImportRow } from "../lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 
 type Mode = "select" | "map" | "done";
@@ -38,7 +38,13 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
   const [groupId, setGroupId] = useState(groups.find((g) => g.isDefault)?.id ?? groups[0]?.id ?? "");
   const [applyRules, setApplyRules] = useState(true);
   const [usingSavedMapping, setUsingSavedMapping] = useState(false);
-  const [result, setResult] = useState<{ created: number; skipped: number; total: number } | null>(null);
+  const [result, setResult] = useState<{
+    created: number;
+    skipped: number;
+    total: number;
+    invalidRowCount: number;
+    invalidSamples: InvalidImportRow[];
+  } | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -107,7 +113,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
       qc.invalidateQueries({ queryKey: ["balances"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Import failed");
+      setError(getErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -319,6 +325,23 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
           <p className="text-sm text-ink-secondary">
             Added {result.created} new transaction(s). Skipped {result.skipped} duplicate(s) out of {result.total} rows.
           </p>
+          {result.invalidRowCount > 0 && (
+            <div className="w-full rounded-lg bg-critical/10 px-3 py-2 text-left text-xs text-critical">
+              <p className="font-medium">
+                {result.invalidRowCount} row(s) couldn't be read and were skipped (unparseable date or missing description).
+              </p>
+              {result.invalidSamples.length > 0 && (
+                <ul className="mt-1 space-y-0.5 font-mono">
+                  {result.invalidSamples.map((s) => (
+                    <li key={s.rowIndex}>
+                      Row {s.rowIndex + 1}: date="{s.dateRaw}" description="{s.descriptionRaw}" ({s.reason.replace("_", " ")})
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-1">Check the date format and column mapping if this looks wrong, then re-import.</p>
+            </div>
+          )}
           <Button onClick={onClose}>Done</Button>
         </div>
       )}

@@ -237,10 +237,27 @@ export type ColumnMapping = {
   invertAmount?: boolean;
   dateFormat?: DateFormat;
 };
+export type InvalidImportRow = {
+  rowIndex: number;
+  reason: "invalid_date" | "missing_description";
+  dateRaw: string;
+  descriptionRaw: string;
+};
+
 export const confirmImport = (
   accountId: string,
   payload: { fileContent: string; filename: string; mapping: ColumnMapping; groupId: string; applyRules: boolean }
-) => api.post<{ batchId: string; created: number; skipped: number; total: number }>(`/import/${accountId}/confirm`, payload).then((r) => r.data);
+) =>
+  api
+    .post<{
+      batchId: string;
+      created: number;
+      skipped: number;
+      total: number;
+      invalidRowCount: number;
+      invalidSamples: InvalidImportRow[];
+    }>(`/import/${accountId}/confirm`, payload)
+    .then((r) => r.data);
 
 // --- Transfers ---
 export const listTransfers = () => api.get<Transfer[]>("/transfers").then((r) => r.data);
