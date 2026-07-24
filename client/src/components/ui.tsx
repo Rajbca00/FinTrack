@@ -90,3 +90,12 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
 export function EmptyState({ message }: { message: string }) {
   return <p className="py-8 text-center text-sm text-ink-muted">{message}</p>;
 }
+
+export function ProgressBar({ value, color }: { value: number; color?: string }) {
+  const pct = Math.max(0, Math.min(100, value));
+  return (
+    <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+      <div className="h-full rounded-full transition-[width]" style={{ width: `${pct}%`, background: color ?? "var(--color-brand)" }} />
+    </div>
+  );
+}

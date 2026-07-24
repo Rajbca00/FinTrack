@@ -41,6 +41,7 @@ model Account {
   groups        Group[]
   transactions  Transaction[]
   importBatches ImportBatch[]
+  goals         Goal[]
 }
 
 // A fund/purpose flag scoped to one account, e.g. "Personal" and
@@ -154,6 +155,7 @@ model Asset {
   archived      Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  goals         Goal[]
 }
 
 // A loan or other debt tracked outside the Account model (which already
@@ -172,6 +174,27 @@ model Liability {
   archived           Boolean   @default(false)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+}
+
+// A savings target the user is tracking towards (emergency fund, vacation,
+// home down payment, etc). currentAmount is a manually-updated figure like
+// Asset.currentValue - the optional linkedAccount/linkedAsset is just a
+// reference shown alongside the goal (e.g. "tracked via this FD"), not an
+// auto-synced balance, so progress stays predictable even if the linked
+// entity is later archived or its balance moves for unrelated reasons.
+model Goal {
+  id              String    @id @default(cuid())
+  name            String
+  targetAmount    Float
+  currentAmount   Float     @default(0)
+  targetDate      DateTime?
+  linkedAccountId String?
+  linkedAccount   Account?  @relation(fields: [linkedAccountId], references: [id], onDelete: SetNull)
+  linkedAssetId   String?
+  linkedAsset     Asset?    @relation(fields: [linkedAssetId], references: [id], onDelete: SetNull)
+  archived        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 // One row per calendar day the net worth breakdown was computed, upserted

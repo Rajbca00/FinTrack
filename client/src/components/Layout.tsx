@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import clsx from "clsx";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", tabLabel: "Home", end: true, icon: IconHome },
   { to: "/net-worth", label: "Net Worth", tabLabel: "Net Worth", icon: IconTrendUp },
+  { to: "/goals", label: "Goals", tabLabel: "Goals", icon: IconFlag },
   { to: "/accounts", label: "Accounts", tabLabel: "Accounts", icon: IconBank },
   { to: "/transactions", label: "Transactions", tabLabel: "Activity", icon: IconList },
   { to: "/transfers", label: "Transfers", tabLabel: "Transfers", icon: IconSwap },
   { to: "/categories", label: "Categories & Rules", tabLabel: "Categories", icon: IconTag },
 ];
+
+// The bottom tab bar only has room for a handful of icons before it feels
+// cramped, and this list keeps growing as more sections ship - so mobile
+// gets the most-used items plus a "More" sheet for the rest, while desktop's
+// sidebar (which scales vertically) still shows everything flat.
+const MOBILE_PRIMARY_COUNT = 4;
+const mobilePrimaryItems = NAV_ITEMS.slice(0, MOBILE_PRIMARY_COUNT);
+const mobileOverflowItems = NAV_ITEMS.slice(MOBILE_PRIMARY_COUNT);
 
 const STORAGE_KEY = "fintrack.sidebarCollapsed";
 
@@ -17,10 +26,16 @@ export function Layout() {
   // Icon-rail collapse, desktop only - the mobile bottom tab bar replaces
   // the sidebar entirely below md, so collapsing has nothing to do there.
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(STORAGE_KEY) === "1");
+  const [showMore, setShowMore] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, collapsed ? "1" : "0");
   }, [collapsed]);
+
+  useEffect(() => {
+    setShowMore(false);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen md:flex">
@@ -72,11 +87,47 @@ export function Layout() {
         <Outlet />
       </main>
 
+      {showMore && (
+        <div className="fixed inset-0 z-40 flex items-end bg-black/60 md:hidden" onClick={() => setShowMore(false)}>
+          <div
+            className="w-full rounded-t-2xl border-t border-hairline bg-surface p-4 pb-8"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">More</h2>
+              <button onClick={() => setShowMore(false)} className="text-ink-muted hover:text-ink" aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <div className="flex flex-col gap-1">
+              {mobileOverflowItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  onClick={() => setShowMore(false)}
+                  className={({ isActive }) =>
+                    clsx(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium",
+                      isActive ? "bg-brand/15 text-brand" : "text-ink-secondary hover:bg-white/5 hover:text-ink"
+                    )
+                  }
+                >
+                  <item.icon className="h-5 w-5 shrink-0" />
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <nav
         className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-hairline bg-surface/95 backdrop-blur md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        {NAV_ITEMS.map((item) => (
+        {mobilePrimaryItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -92,6 +143,18 @@ export function Layout() {
             <span>{item.tabLabel}</span>
           </NavLink>
         ))}
+        {mobileOverflowItems.length > 0 && (
+          <button
+            onClick={() => setShowMore(true)}
+            className={clsx(
+              "flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium",
+              mobileOverflowItems.some((i) => i.to === location.pathname) ? "text-brand" : "text-ink-muted"
+            )}
+          >
+            <IconMore className="h-5 w-5" />
+            <span>More</span>
+          </button>
+        )}
       </nav>
     </div>
   );
@@ -121,6 +184,25 @@ function IconTrendUp({ className }: IconProps) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 17 9 11l4 4 8-8" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 7h6v6" />
+    </svg>
+  );
+}
+
+function IconFlag({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 21V4" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 4h13l-3 4 3 4H5" />
+    </svg>
+  );
+}
+
+function IconMore({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <circle cx="5" cy="12" r="1.75" />
+      <circle cx="12" cy="12" r="1.75" />
+      <circle cx="19" cy="12" r="1.75" />
     </svg>
   );
 }

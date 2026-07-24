@@ -341,3 +341,25 @@ export function useNetWorth() {
 export function useNetWorthTrend() {
   return useQuery({ queryKey: ["netWorthTrend"], queryFn: api.getNetWorthTrend });
 }
+
+export function useGoals() {
+  return useQuery({ queryKey: ["goals"], queryFn: api.listGoals });
+}
+
+export function useCreateGoal() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.createGoal, onSuccess: () => qc.invalidateQueries({ queryKey: ["goals"] }) });
+}
+
+export function useUpdateGoal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<api.Goal> }) => api.updateGoal(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["goals"] }),
+  });
+}
+
+export function useDeleteGoal() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.deleteGoal, onSuccess: () => qc.invalidateQueries({ queryKey: ["goals"] }) });
+}

@@ -355,6 +355,27 @@ export type NetWorthTrendPoint = NetWorthBreakdown & { date: string };
 export const getNetWorth = () => api.get<NetWorthBreakdown>("/summary/net-worth").then((r) => r.data);
 export const getNetWorthTrend = () => api.get<NetWorthTrendPoint[]>("/summary/net-worth/trend").then((r) => r.data);
 
+// --- Goals ---
+export type Goal = {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate: string | null;
+  linkedAccountId: string | null;
+  linkedAccount?: Account | null;
+  linkedAssetId: string | null;
+  linkedAsset?: Asset | null;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const listGoals = () => api.get<Goal[]>("/goals").then((r) => r.data);
+export const createGoal = (data: Partial<Goal>) => api.post<Goal>("/goals", data).then((r) => r.data);
+export const updateGoal = (id: string, data: Partial<Goal>) => api.put<Goal>(`/goals/${id}`, data).then((r) => r.data);
+export const deleteGoal = (id: string) => api.delete(`/goals/${id}`);
+
 export type CategoryTrendMonth = { key: string; label: string };
 export type CategoryTrendRow = { categoryId: string; name: string; color: string | null; totals: number[]; total: number };
 export const getCategoryTrend = (params: {

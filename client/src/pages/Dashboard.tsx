@@ -14,8 +14,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useAccounts, useBalances, useBreakdown, useCategoryTrend, useNetWorth, useNetWorthTrend, useTrend } from "../hooks/useApi";
-import { Card, Select, Label } from "../components/ui";
+import { useAccounts, useBalances, useBreakdown, useCategoryTrend, useGoals, useNetWorth, useNetWorthTrend, useTrend } from "../hooks/useApi";
+import { Card, Select, Label, ProgressBar } from "../components/ui";
 import { formatMoney, formatDate } from "../lib/format";
 import { CHROME, DIVERGING, categoricalColor } from "../lib/palette";
 
@@ -29,6 +29,7 @@ export function Dashboard() {
   const { data: balances } = useBalances();
   const { data: netWorth } = useNetWorth();
   const { data: netWorthTrend } = useNetWorthTrend();
+  const { data: goals } = useGoals();
   const [period, setPeriod] = useState<Period>("month");
   const [accountId, setAccountId] = useState("");
   // Filters the report sections (trend/breakdown/category-trend) below by
@@ -289,6 +290,32 @@ export function Dashboard() {
           </div>
         )}
       </Card>
+
+      {(goals?.length ?? 0) > 0 && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink-secondary">Active goals</h2>
+            <Link to="/goals" className="text-sm font-medium text-brand hover:underline">
+              View all →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {goals?.map((goal) => {
+              const pct = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
+              return (
+                <Card key={goal.id} className="flex flex-col gap-2">
+                  <p className="font-medium text-ink">{goal.name}</p>
+                  <div className="flex items-baseline justify-between">
+                    <p className="text-sm font-semibold text-ink">{formatMoney(goal.currentAmount)}</p>
+                    <p className="text-xs text-ink-muted">of {formatMoney(goal.targetAmount)}</p>
+                  </div>
+                  <ProgressBar value={pct} color={pct >= 100 ? "var(--color-good)" : undefined} />
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total balance" value={formatMoney(totalBalance)} />
