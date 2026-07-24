@@ -385,3 +385,47 @@ export function useDeleteBudget() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: api.deleteBudget, onSuccess: () => qc.invalidateQueries({ queryKey: ["budgets"] }) });
 }
+
+export function useBills() {
+  return useQuery({ queryKey: ["bills"], queryFn: api.listBills });
+}
+
+export function useBillSuggestions() {
+  return useQuery({ queryKey: ["billSuggestions"], queryFn: api.getBillSuggestions });
+}
+
+export function useCreateBill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createBill,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["bills"] });
+      qc.invalidateQueries({ queryKey: ["billSuggestions"] });
+    },
+  });
+}
+
+export function useUpdateBill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<api.Bill> }) => api.updateBill(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["bills"] }),
+  });
+}
+
+export function useDeleteBill() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.deleteBill, onSuccess: () => qc.invalidateQueries({ queryKey: ["bills"] }) });
+}
+
+export function useMerchantSuggestion(query: string) {
+  return useQuery({
+    queryKey: ["merchantSuggest", query],
+    queryFn: () => api.suggestMerchant(query),
+    enabled: query.trim().length >= 3,
+  });
+}
+
+export function useMerchantIntelligence() {
+  return useQuery({ queryKey: ["merchantIntelligence"], queryFn: api.getMerchantIntelligence });
+}

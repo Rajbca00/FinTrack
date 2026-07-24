@@ -176,6 +176,8 @@ export type TransactionListParams = {
   from?: string;
   to?: string;
   q?: string;
+  minAmount?: number;
+  maxAmount?: number;
   page?: number;
   pageSize?: number;
 };
@@ -399,6 +401,57 @@ export const createBudget = (data: { categoryId: string; amount: number; period:
 export const updateBudget = (id: string, data: Partial<{ categoryId: string; amount: number; period: BudgetPeriod }>) =>
   api.put<Budget>(`/budgets/${id}`, data).then((r) => r.data);
 export const deleteBudget = (id: string) => api.delete(`/budgets/${id}`);
+
+// --- Bills ---
+export type BillRecurrence = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY";
+
+export type Bill = {
+  id: string;
+  name: string;
+  amount: number;
+  categoryId: string | null;
+  category?: Category | null;
+  nextDueDate: string;
+  recurrence: BillRecurrence;
+  autoDetected: boolean;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BillGroups = { dueToday: Bill[]; dueThisWeek: Bill[]; dueThisMonth: Bill[]; later: Bill[] };
+
+export const listBills = () => api.get<{ bills: Bill[]; groups: BillGroups }>("/bills").then((r) => r.data);
+export const createBill = (data: Partial<Bill>) => api.post<Bill>("/bills", data).then((r) => r.data);
+export const updateBill = (id: string, data: Partial<Bill>) => api.put<Bill>(`/bills/${id}`, data).then((r) => r.data);
+export const deleteBill = (id: string) => api.delete(`/bills/${id}`);
+
+export type BillSuggestion = {
+  description: string;
+  amount: number;
+  occurrences: number;
+  categoryId: string | null;
+  suggestedNextDueDate: string;
+};
+export const getBillSuggestions = () => api.get<BillSuggestion[]>("/bills/suggestions").then((r) => r.data);
+
+// --- Merchant intelligence ---
+export type MerchantSuggestion = {
+  categoryId: string | null;
+  accountId: string | null;
+  groupId: string | null;
+  matchCount: number;
+} | null;
+
+export const suggestMerchant = (q: string) => api.get<MerchantSuggestion>("/merchants/suggest", { params: { q } }).then((r) => r.data);
+
+export type MerchantStat = { name: string; count: number; total: number };
+export type MerchantIntelligence = {
+  topMerchants: MerchantStat[];
+  topCategories: (MerchantStat & { color: string | null })[];
+  topExpenses: MerchantStat[];
+};
+export const getMerchantIntelligence = () => api.get<MerchantIntelligence>("/merchants/top").then((r) => r.data);
 
 export type CategoryTrendMonth = { key: string; label: string };
 export type CategoryTrendRow = { categoryId: string; name: string; color: string | null; totals: number[]; total: number };

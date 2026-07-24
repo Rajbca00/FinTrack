@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { to: "/net-worth", label: "Net Worth", tabLabel: "Net Worth", icon: IconTrendUp, primary: true },
   { to: "/goals", label: "Goals", tabLabel: "Goals", icon: IconFlag, primary: false },
   { to: "/budgets", label: "Budgets", tabLabel: "Budgets", icon: IconPie, primary: false },
+  { to: "/bills", label: "Bills", tabLabel: "Bills", icon: IconCalendar, primary: false },
   { to: "/accounts", label: "Accounts", tabLabel: "Accounts", icon: IconBank, primary: true },
   { to: "/transactions", label: "Transactions", tabLabel: "Activity", icon: IconList, primary: true },
   { to: "/transfers", label: "Transfers", tabLabel: "Transfers", icon: IconSwap, primary: false },
@@ -212,6 +213,15 @@ function IconPie({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v9l7.5 4.3A9 9 0 1 1 12 3Z" />
+    </svg>
+  );
+}
+
+function IconCalendar({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path strokeLinecap="round" d="M3 10h18M8 3v4M16 3v4" />
     </svg>
   );
 }

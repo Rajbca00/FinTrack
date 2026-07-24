@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useAccounts, useCategories, useCreateTransaction, useCreateTransfer } from "../hooks/useApi";
+import { useEffect, useState } from "react";
+import { useAccounts, useCategories, useCreateTransaction, useCreateTransfer, useMerchantSuggestion } from "../hooks/useApi";
 import { Button, Input, Label, Modal, Select } from "./ui";
 import { assignableCategories, getErrorMessage } from "../lib/api";
 
@@ -28,6 +28,17 @@ export function AddTransactionModal({
   const [categoryId, setCategoryId] = useState("");
   const [transferToAccountId, setTransferToAccountId] = useState("");
   const [transferToGroupId, setTransferToGroupId] = useState("");
+
+  // Debounced so typing doesn't fire a lookup on every keystroke - only
+  // matters once the description settles for a moment.
+  const [debouncedDescription, setDebouncedDescription] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedDescription(description), 400);
+    return () => clearTimeout(t);
+  }, [description]);
+  const { data: suggestion } = useMerchantSuggestion(debouncedDescription);
+  const suggestedCategory = categories?.find((c) => c.id === suggestion?.categoryId);
+  const showSuggestion = !categoryId && suggestion?.categoryId && suggestedCategory && (suggestion.matchCount ?? 0) >= 2;
 
   const account = accounts?.find((a) => a.id === accountId);
   const isTransferCategory = categories?.find((c) => c.id === categoryId)?.type === "TRANSFER";
@@ -81,6 +92,15 @@ export function AddTransactionModal({
         <div>
           <Label>Description</Label>
           <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Coffee shop" />
+          {showSuggestion && (
+            <button
+              type="button"
+              className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-brand/10 px-2.5 py-1.5 text-xs text-brand hover:bg-brand/15"
+              onClick={() => setCategoryId(suggestedCategory!.id)}
+            >
+              Similar transactions are usually categorized as <strong>{suggestedCategory!.name}</strong> - use this?
+            </button>
+          )}
         </div>
         <div>
           <Label>{isTransferCategory ? "Amount to transfer" : "Amount (negative = money out, positive = money in)"}</Label>

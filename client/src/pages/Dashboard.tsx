@@ -17,10 +17,12 @@ import {
 import {
   useAccounts,
   useBalances,
+  useBills,
   useBreakdown,
   useBudgets,
   useCategoryTrend,
   useGoals,
+  useMerchantIntelligence,
   useNetWorth,
   useNetWorthTrend,
   useTrend,
@@ -28,6 +30,7 @@ import {
 import { Card, Select, Label, ProgressBar, Badge } from "../components/ui";
 import { formatMoney, formatDate } from "../lib/format";
 import { CHROME, DIVERGING, categoricalColor } from "../lib/palette";
+import type { Bill } from "../lib/api";
 
 type Period = "week" | "month" | "year";
 
@@ -42,6 +45,8 @@ export function Dashboard() {
   const { data: goals } = useGoals();
   const { data: budgets } = useBudgets();
   const budgetAlerts = useMemo(() => (budgets ?? []).filter((b) => b.amount > 0 && b.spent / b.amount >= 0.8), [budgets]);
+  const { data: billData } = useBills();
+  const { data: merchantIntel } = useMerchantIntelligence();
   const [period, setPeriod] = useState<Period>("month");
   const [accountId, setAccountId] = useState("");
   // Filters the report sections (trend/breakdown/category-trend) below by
@@ -359,6 +364,22 @@ export function Dashboard() {
         </div>
       )}
 
+      {((billData?.groups.dueToday.length ?? 0) + (billData?.groups.dueThisWeek.length ?? 0) + (billData?.groups.dueThisMonth.length ?? 0)) > 0 && (
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink-secondary">Upcoming bills</h2>
+            <Link to="/bills" className="text-sm font-medium text-brand hover:underline">
+              View all →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <BillGroupColumn title="Due today" bills={billData?.groups.dueToday ?? []} />
+            <BillGroupColumn title="Due this week" bills={billData?.groups.dueThisWeek ?? []} />
+            <BillGroupColumn title="Due this month" bills={billData?.groups.dueThisMonth ?? []} />
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total balance" value={formatMoney(totalBalance)} />
         <StatCard label={`Income (${currentPeriod?.label ?? "this period"})`} value={formatMoney(income)} tone="good" />
@@ -525,6 +546,66 @@ export function Dashboard() {
           ))}
         </div>
       </div>
+
+      {merchantIntel && (merchantIntel.topMerchants.length > 0 || merchantIntel.topCategories.length > 0) && (
+        <div>
+          <h2 className="mb-2 text-sm font-semibold text-ink-secondary">Merchant insights</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Card>
+              <p className="mb-2 text-xs font-medium text-ink-muted">Top merchants</p>
+              <ul className="flex flex-col gap-1.5 text-sm">
+                {merchantIntel.topMerchants.map((m) => (
+                  <li key={m.name} className="flex items-center justify-between">
+                    <span className="truncate text-ink-secondary">{m.name}</span>
+                    <span className="shrink-0 pl-2 text-xs text-ink-muted">{m.count}×</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+            <Card>
+              <p className="mb-2 text-xs font-medium text-ink-muted">Most frequent categories</p>
+              <ul className="flex flex-col gap-1.5 text-sm">
+                {merchantIntel.topCategories.map((c) => (
+                  <li key={c.name} className="flex items-center justify-between">
+                    <Badge color={c.color}>{c.name}</Badge>
+                    <span className="shrink-0 pl-2 text-xs text-ink-muted">{c.count}×</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+            <Card>
+              <p className="mb-2 text-xs font-medium text-ink-muted">Most frequent expenses</p>
+              <ul className="flex flex-col gap-1.5 text-sm">
+                {merchantIntel.topExpenses.map((m) => (
+                  <li key={m.name} className="flex items-center justify-between">
+                    <span className="truncate text-ink-secondary">{m.name}</span>
+                    <span className="shrink-0 pl-2 text-xs font-medium text-ink">{formatMoney(m.total)}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BillGroupColumn({ title, bills }: { title: string; bills: Bill[] }) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-medium text-ink-muted">
+        {title} ({bills.length})
+      </p>
+      {bills.length === 0 && <p className="text-xs text-ink-muted">Nothing due</p>}
+      <ul className="flex flex-col gap-1.5">
+        {bills.map((b) => (
+          <li key={b.id} className="flex items-center justify-between text-sm">
+            <span className="text-ink-secondary">{b.name}</span>
+            <span className="font-medium text-ink">{formatMoney(b.amount)}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -76,6 +76,7 @@ model Category {
   rules        CategoryRule[]
   transactions Transaction[]
   budgets      Budget[]
+  bills        Bill[]
 }
 
 model CategoryRule {
@@ -191,6 +192,25 @@ model Budget {
   archived   Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+// A recurring expense (EMI, insurance, rent, subscription) tracked so the
+// Dashboard can surface what's coming up. nextDueDate is rolled forward by
+// `recurrence` on read once it's in the past (see services/bills.ts) - same
+// upsert-on-read shape as NetWorthSnapshot - so there's no cron keeping it
+// current and no risk of it silently going stale.
+model Bill {
+  id           String    @id @default(cuid())
+  name         String
+  amount       Float
+  categoryId   String?
+  category     Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  nextDueDate  DateTime
+  recurrence   String    @default("MONTHLY")
+  autoDetected Boolean   @default(false)
+  archived     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 // A savings target the user is tracking towards (emergency fund, vacation,

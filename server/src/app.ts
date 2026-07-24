@@ -1,3 +1,8 @@
+// Patches Express's Router methods so a rejected Promise inside an async
+// route handler is forwarded to the error-handling middleware below instead
+// of becoming an unhandled rejection that crashes the whole process - must
+// be imported before any router that defines async handlers.
+import "express-async-errors";
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -14,6 +19,8 @@ import { assetsRouter } from "./routes/assets";
 import { liabilitiesRouter } from "./routes/liabilities";
 import { goalsRouter } from "./routes/goals";
 import { budgetsRouter } from "./routes/budgets";
+import { billsRouter } from "./routes/bills";
+import { merchantsRouter } from "./routes/merchants";
 
 export function createApp() {
   const app = express();
@@ -35,6 +42,8 @@ export function createApp() {
   app.use("/api/liabilities", liabilitiesRouter);
   app.use("/api/goals", goalsRouter);
   app.use("/api/budgets", budgetsRouter);
+  app.use("/api/bills", billsRouter);
+  app.use("/api/merchants", merchantsRouter);
 
   // In production this single Node service also serves the built React app,
   // so Render only needs one web service (no separate static site / CDN).
