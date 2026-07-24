@@ -1,8 +1,11 @@
 // Patches Express's Router methods so a rejected Promise inside an async
 // route handler is forwarded to the error-handling middleware below instead
 // of becoming an unhandled rejection that crashes the whole process - must
-// be imported before any router that defines async handlers.
-import "express-async-errors";
+// be imported before any router that defines async handlers. Inlined locally
+// (see lib/asyncErrors.ts) rather than depending on the express-async-errors
+// package, which went missing from the Vercel serverless bundle in
+// production despite installing fine everywhere else.
+import "./lib/asyncErrors";
 import express from "express";
 import cors from "cors";
 import path from "path";
