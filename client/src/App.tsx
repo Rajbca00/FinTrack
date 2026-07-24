@@ -10,6 +10,7 @@ import { NetWorth } from "./pages/NetWorth";
 import { Goals } from "./pages/Goals";
 import { Budgets } from "./pages/Budgets";
 import { Bills } from "./pages/Bills";
+import { Settings } from "./pages/Settings";
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/goals" element={<Goals />} />
         <Route path="/budgets" element={<Budgets />} />
         <Route path="/bills" element={<Bills />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/categories" element={<Categories />} />
       </Route>
     </Routes>

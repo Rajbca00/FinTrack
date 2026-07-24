@@ -470,6 +470,10 @@ export const uploadAttachment = (transactionId: string, data: { filename: string
 export const getAttachment = (id: string) => api.get<AttachmentWithData>(`/attachments/${id}`).then((r) => r.data);
 export const deleteAttachment = (id: string) => api.delete(`/attachments/${id}`);
 
+// --- Settings / backup ---
+export const exportData = () => api.get<Record<string, unknown>>("/settings/export").then((r) => r.data);
+export const importData = (payload: Record<string, unknown>) => api.post("/settings/import", payload);
+
 export type CategoryTrendMonth = { key: string; label: string };
 export type CategoryTrendRow = { categoryId: string; name: string; color: string | null; totals: number[]; total: number };
 export const getCategoryTrend = (params: {
