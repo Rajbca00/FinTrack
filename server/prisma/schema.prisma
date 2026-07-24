@@ -14,6 +14,8 @@ datasource db {
 //   CategoryType: INCOME | EXPENSE | TRANSFER
 //   MatchType:    CONTAINS | STARTS_WITH | REGEX | EXACT
 //   TransferType: ACCOUNT_TRANSFER | GROUP_REALLOCATION
+//   AssetType:    FIXED_DEPOSIT | MUTUAL_FUND | EPF | PPF | GOLD | CASH | REAL_ESTATE | VEHICLE | CRYPTO | OTHER
+//   LiabilityType: HOME_LOAN | PERSONAL_LOAN | GOLD_LOAN | VEHICLE_LOAN | CREDIT_CARD | OTHER
 
 // A bank account or credit card. Balances are never stored directly on the
 // account - they are derived from the opening balances + transactions of
@@ -136,4 +138,54 @@ model ImportBatch {
   rowCount          Int
   skippedDuplicates Int           @default(0)
   transactions      Transaction[]
+}
+
+// A non-transactional holding that contributes to net worth - fixed deposits,
+// mutual funds, EPF/PPF, gold, real estate, etc. Unlike Account/Transaction,
+// there's no ledger here: currentValue is just overwritten as the user (or,
+// later, a market-data sync) refreshes it. updatedAt doubles as "last updated".
+model Asset {
+  id            String   @id @default(cuid())
+  name          String
+  type          String
+  currentValue  Float
+  purchaseValue Float?
+  notes         String?
+  archived      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// A loan or other debt tracked outside the Account model (which already
+// covers credit cards with transaction-level detail). Contributes negatively
+// to net worth alongside credit card account balances.
+model Liability {
+  id                 String    @id @default(cuid())
+  name               String
+  type               String
+  outstandingBalance Float
+  interestRate       Float?
+  emiAmount          Float?
+  nextDueDate        DateTime?
+  lender             String?
+  notes              String?
+  archived           Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+// One row per calendar day the net worth breakdown was computed, upserted
+// on read (see services/netWorth.ts) rather than on a cron - this is what
+// powers the Net Worth Trend chart, and it builds up history organically
+// from the day this feature shipped without needing a scheduler.
+model NetWorthSnapshot {
+  id           String   @id @default(cuid())
+  date         DateTime @unique
+  cashAndBank  Float
+  investments  Float
+  retirement   Float
+  otherAssets  Float
+  liabilities  Float
+  netWorth     Float
+  createdAt    DateTime @default(now())
 }

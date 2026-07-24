@@ -259,3 +259,85 @@ export function useCategoryTrend(params: {
 }) {
   return useQuery({ queryKey: ["categoryTrend", params], queryFn: () => api.getCategoryTrend(params) });
 }
+
+export function useAssets() {
+  return useQuery({ queryKey: ["assets"], queryFn: api.listAssets });
+}
+
+export function useCreateAsset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createAsset,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["assets"] });
+      qc.invalidateQueries({ queryKey: ["netWorth"] });
+    },
+  });
+}
+
+export function useUpdateAsset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<api.Asset> }) => api.updateAsset(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["assets"] });
+      qc.invalidateQueries({ queryKey: ["netWorth"] });
+    },
+  });
+}
+
+export function useDeleteAsset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteAsset,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["assets"] });
+      qc.invalidateQueries({ queryKey: ["netWorth"] });
+    },
+  });
+}
+
+export function useLiabilities() {
+  return useQuery({ queryKey: ["liabilities"], queryFn: api.listLiabilities });
+}
+
+export function useCreateLiability() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createLiability,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["liabilities"] });
+      qc.invalidateQueries({ queryKey: ["netWorth"] });
+    },
+  });
+}
+
+export function useUpdateLiability() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<api.Liability> }) => api.updateLiability(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["liabilities"] });
+      qc.invalidateQueries({ queryKey: ["netWorth"] });
+    },
+  });
+}
+
+export function useDeleteLiability() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteLiability,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["liabilities"] });
+      qc.invalidateQueries({ queryKey: ["netWorth"] });
+    },
+  });
+}
+
+export function useNetWorth() {
+  return useQuery({ queryKey: ["netWorth"], queryFn: api.getNetWorth });
+}
+
+export function useNetWorthTrend() {
+  return useQuery({ queryKey: ["netWorthTrend"], queryFn: api.getNetWorthTrend });
+}

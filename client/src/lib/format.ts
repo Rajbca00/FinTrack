@@ -17,3 +17,25 @@ export function toDateInputValue(iso: string): string {
 export function groupDisplayName(group: { name: string; accountName?: string }): string {
   return group.accountName ? `${group.accountName} - ${group.name}` : group.name;
 }
+
+export const ASSET_TYPE_LABELS: Record<string, string> = {
+  FIXED_DEPOSIT: "Fixed Deposit",
+  MUTUAL_FUND: "Mutual Fund",
+  EPF: "EPF",
+  PPF: "PPF",
+  GOLD: "Gold",
+  CASH: "Cash in Hand",
+  REAL_ESTATE: "Real Estate",
+  VEHICLE: "Vehicle",
+  CRYPTO: "Cryptocurrency",
+  OTHER: "Other",
+};
+
+export const LIABILITY_TYPE_LABELS: Record<string, string> = {
+  HOME_LOAN: "Home Loan",
+  PERSONAL_LOAN: "Personal Loan",
+  GOLD_LOAN: "Gold Loan",
+  VEHICLE_LOAN: "Vehicle Loan",
+  CREDIT_CARD: "Credit Card",
+  OTHER: "Other",
+};

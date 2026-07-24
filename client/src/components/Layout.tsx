@@ -4,6 +4,7 @@ import clsx from "clsx";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", tabLabel: "Home", end: true, icon: IconHome },
+  { to: "/net-worth", label: "Net Worth", tabLabel: "Net Worth", icon: IconTrendUp },
   { to: "/accounts", label: "Accounts", tabLabel: "Accounts", icon: IconBank },
   { to: "/transactions", label: "Transactions", tabLabel: "Activity", icon: IconList },
   { to: "/transfers", label: "Transfers", tabLabel: "Transfers", icon: IconSwap },
@@ -111,6 +112,15 @@ function IconHome({ className }: IconProps) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 11.5 12 4l9 7.5" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9" />
+    </svg>
+  );
+}
+
+function IconTrendUp({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 17 9 11l4 4 8-8" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 7h6v6" />
     </svg>
   );
 }

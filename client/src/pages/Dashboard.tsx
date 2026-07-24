@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { format, subMonths } from "date-fns";
 import {
   Bar,
@@ -6,14 +7,16 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { useAccounts, useBalances, useBreakdown, useCategoryTrend, useTrend } from "../hooks/useApi";
+import { useAccounts, useBalances, useBreakdown, useCategoryTrend, useNetWorth, useNetWorthTrend, useTrend } from "../hooks/useApi";
 import { Card, Select, Label } from "../components/ui";
-import { formatMoney } from "../lib/format";
+import { formatMoney, formatDate } from "../lib/format";
 import { CHROME, DIVERGING, categoricalColor } from "../lib/palette";
 
 type Period = "week" | "month" | "year";
@@ -24,6 +27,8 @@ export function Dashboard() {
 
   const { data: accounts } = useAccounts();
   const { data: balances } = useBalances();
+  const { data: netWorth } = useNetWorth();
+  const { data: netWorthTrend } = useNetWorthTrend();
   const [period, setPeriod] = useState<Period>("month");
   const [accountId, setAccountId] = useState("");
   // Filters the report sections (trend/breakdown/category-trend) below by
@@ -223,6 +228,66 @@ export function Dashboard() {
             ))}
           </Select>
         </div>
+      </Card>
+
+      <Card className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-xs font-medium text-ink-muted">Net Worth</p>
+            <p className={`text-3xl font-semibold ${(netWorth?.netWorth ?? 0) < 0 ? "text-critical" : "text-ink"}`}>
+              {formatMoney(netWorth?.netWorth ?? 0)}
+            </p>
+          </div>
+          <Link to="/net-worth" className="text-sm font-medium text-brand hover:underline">
+            Manage assets & liabilities →
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-4 border-t border-hairline pt-4 sm:grid-cols-5">
+          <div>
+            <p className="text-xs text-ink-muted">Cash & Bank</p>
+            <p className="text-sm font-semibold text-ink">{formatMoney(netWorth?.cashAndBank ?? 0)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-ink-muted">Investments</p>
+            <p className="text-sm font-semibold text-ink">{formatMoney(netWorth?.investments ?? 0)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-ink-muted">Retirement</p>
+            <p className="text-sm font-semibold text-ink">{formatMoney(netWorth?.retirement ?? 0)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-ink-muted">Other Assets</p>
+            <p className="text-sm font-semibold text-ink">{formatMoney(netWorth?.otherAssets ?? 0)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-ink-muted">Liabilities</p>
+            <p className="text-sm font-semibold text-critical">{formatMoney(netWorth?.liabilities ?? 0)}</p>
+          </div>
+        </div>
+        {(netWorthTrend?.length ?? 0) > 1 && (
+          <div className="border-t border-hairline pt-4">
+            <p className="mb-2 text-xs font-semibold text-ink-secondary">Net Worth Trend</p>
+            <ResponsiveContainer width="100%" height={160}>
+              <LineChart data={netWorthTrend}>
+                <CartesianGrid vertical={false} stroke={chrome.gridline} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: chrome.mutedInk, fontSize: 11 }}
+                  axisLine={{ stroke: chrome.baseline }}
+                  tickLine={false}
+                  tickFormatter={(v) => formatDate(v)}
+                />
+                <YAxis tick={{ fill: chrome.mutedInk, fontSize: 11 }} axisLine={false} tickLine={false} width={70} tickFormatter={(v) => formatMoney(v)} />
+                <Tooltip
+                  content={<ChartTooltip currency="INR" />}
+                  labelFormatter={(v) => formatDate(String(v))}
+                  cursor={{ stroke: chrome.gridline }}
+                />
+                <Line type="monotone" dataKey="netWorth" name="Net Worth" stroke={diverging.positive} strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </Card>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

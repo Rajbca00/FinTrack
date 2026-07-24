@@ -287,6 +287,74 @@ export const getBreakdown = (params: {
 }) => api.get<BreakdownPoint[]>("/summary/breakdown", { params }).then((r) => r.data);
 export const getBalances = () => api.get<AccountBalance[]>("/summary/balances").then((r) => r.data);
 
+// --- Assets ---
+export type AssetType =
+  | "FIXED_DEPOSIT"
+  | "MUTUAL_FUND"
+  | "EPF"
+  | "PPF"
+  | "GOLD"
+  | "CASH"
+  | "REAL_ESTATE"
+  | "VEHICLE"
+  | "CRYPTO"
+  | "OTHER";
+
+export type Asset = {
+  id: string;
+  name: string;
+  type: AssetType;
+  currentValue: number;
+  purchaseValue: number | null;
+  notes: string | null;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const listAssets = () => api.get<Asset[]>("/assets").then((r) => r.data);
+export const createAsset = (data: Partial<Asset>) => api.post<Asset>("/assets", data).then((r) => r.data);
+export const updateAsset = (id: string, data: Partial<Asset>) => api.put<Asset>(`/assets/${id}`, data).then((r) => r.data);
+export const deleteAsset = (id: string) => api.delete(`/assets/${id}`);
+
+// --- Liabilities ---
+export type LiabilityType = "HOME_LOAN" | "PERSONAL_LOAN" | "GOLD_LOAN" | "VEHICLE_LOAN" | "CREDIT_CARD" | "OTHER";
+
+export type Liability = {
+  id: string;
+  name: string;
+  type: LiabilityType;
+  outstandingBalance: number;
+  interestRate: number | null;
+  emiAmount: number | null;
+  nextDueDate: string | null;
+  lender: string | null;
+  notes: string | null;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const listLiabilities = () => api.get<Liability[]>("/liabilities").then((r) => r.data);
+export const createLiability = (data: Partial<Liability>) => api.post<Liability>("/liabilities", data).then((r) => r.data);
+export const updateLiability = (id: string, data: Partial<Liability>) =>
+  api.put<Liability>(`/liabilities/${id}`, data).then((r) => r.data);
+export const deleteLiability = (id: string) => api.delete(`/liabilities/${id}`);
+
+// --- Net worth ---
+export type NetWorthBreakdown = {
+  cashAndBank: number;
+  investments: number;
+  retirement: number;
+  otherAssets: number;
+  liabilities: number;
+  netWorth: number;
+};
+export type NetWorthTrendPoint = NetWorthBreakdown & { date: string };
+
+export const getNetWorth = () => api.get<NetWorthBreakdown>("/summary/net-worth").then((r) => r.data);
+export const getNetWorthTrend = () => api.get<NetWorthTrendPoint[]>("/summary/net-worth/trend").then((r) => r.data);
+
 export type CategoryTrendMonth = { key: string; label: string };
 export type CategoryTrendRow = { categoryId: string; name: string; color: string | null; totals: number[]; total: number };
 export const getCategoryTrend = (params: {

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { getTrend, getCategoryBreakdown, getCategoryMonthlyBreakdown, getBalances } from "../services/summary";
+import { computeNetWorth, recordSnapshot, getNetWorthTrend } from "../services/netWorth";
 
 export const summaryRouter = Router();
 
@@ -62,4 +63,15 @@ summaryRouter.get("/category-trend", async (req, res) => {
 summaryRouter.get("/balances", async (_req, res) => {
   const balances = await getBalances();
   res.json(balances);
+});
+
+summaryRouter.get("/net-worth", async (_req, res) => {
+  const breakdown = await computeNetWorth();
+  await recordSnapshot(breakdown);
+  res.json(breakdown);
+});
+
+summaryRouter.get("/net-worth/trend", async (_req, res) => {
+  const trend = await getNetWorthTrend();
+  res.json(trend);
 });
