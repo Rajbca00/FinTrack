@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useBudgets, useCreateBudget, useUpdateBudget, useDeleteBudget, useCategories } from "../hooks/useApi";
-import { Card, Button, Modal, Input, Select, Label, EmptyState, ProgressBar, Badge } from "../components/ui";
+import { Card, Button, Modal, Input, Select, Label, EmptyState, ProgressBar, Badge, Loading } from "../components/ui";
 import { assignableCategories } from "../lib/api";
 import { formatMoney } from "../lib/format";
 import type { Budget, BudgetPeriod } from "../lib/api";
@@ -25,8 +25,13 @@ export function Budgets() {
         </Button>
       </div>
 
+      {isLoading && <Loading />}
       {!isLoading && (budgets?.length ?? 0) === 0 && (
-        <EmptyState message="No budgets yet. Set a monthly limit for a category like Groceries or Dining Out." />
+        <EmptyState
+          title="Set your first budget"
+          message="Set a monthly limit for a category like Groceries or Dining Out and track spending against it."
+          action={{ label: "+ Add budget", onClick: () => setShowAdd(true) }}
+        />
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

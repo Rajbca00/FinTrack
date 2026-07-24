@@ -110,6 +110,7 @@ model Transaction {
   importBatchId  String?
   importBatch    ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   dedupeKey      String?      // hash of date+description+amount, used to skip duplicate imports
+  attachments    Attachment[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -117,6 +118,23 @@ model Transaction {
   @@index([groupId])
   @@index([categoryId])
   @@unique([accountId, dedupeKey])
+}
+
+// A receipt/invoice/photo/PDF attached to a transaction, for reimbursements
+// and audits. Stored as base64 directly in Postgres (capped at ~5MB raw) -
+// there's no blob storage wired up for this app, and a personal finance
+// tool's receipt volume doesn't warrant standing one up yet. If that
+// changes, `data` can become a URL instead without touching callers that
+// only care about filename/mimeType/size for the list view.
+model Attachment {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  filename      String
+  mimeType      String
+  size          Int
+  data          String
+  createdAt     DateTime    @default(now())
 }
 
 // One Transfer groups the 2 Transaction legs it creates - either moving

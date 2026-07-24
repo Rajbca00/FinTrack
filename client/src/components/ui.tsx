@@ -87,8 +87,58 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
   );
 }
 
-export function EmptyState({ message }: { message: string }) {
-  return <p className="py-8 text-center text-sm text-ink-muted">{message}</p>;
+export function EmptyState({
+  title,
+  message,
+  action,
+}: {
+  title?: string;
+  message: string;
+  action?: { label: string; onClick: () => void };
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-10 text-center">
+      {title && <p className="text-sm font-semibold text-ink">{title}</p>}
+      <p className="max-w-sm text-sm text-ink-muted">{message}</p>
+      {action && (
+        <Button variant="secondary" onClick={action.onClick}>
+          {action.label}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+export function Loading({ label = "Loading…" }: { label?: string }) {
+  return (
+    <div className="flex items-center justify-center gap-2 py-8 text-sm text-ink-muted">
+      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-ink-muted/40 border-t-brand" />
+      {label}
+    </div>
+  );
+}
+
+export function Toast({
+  message,
+  actionLabel,
+  onAction,
+}: {
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="fixed inset-x-0 bottom-20 z-50 flex justify-center px-4 sm:bottom-6">
+      <div className="flex items-center gap-3 rounded-full border border-hairline-strong bg-surface px-4 py-2 text-sm text-ink shadow-2xl shadow-black/40">
+        <span>{message}</span>
+        {actionLabel && onAction && (
+          <button className="font-semibold text-brand hover:underline" onClick={onAction}>
+            {actionLabel}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function ProgressBar({ value, color }: { value: number; color?: string }) {

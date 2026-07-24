@@ -7,7 +7,7 @@ import {
   useDeleteBill,
   useCategories,
 } from "../hooks/useApi";
-import { Card, Button, Modal, Input, Select, Label, EmptyState, Badge } from "../components/ui";
+import { Card, Button, Modal, Input, Select, Label, EmptyState, Badge, Loading } from "../components/ui";
 import { assignableCategories } from "../lib/api";
 import { formatMoney, formatDate, toDateInputValue } from "../lib/format";
 import type { Bill, BillRecurrence, BillSuggestion } from "../lib/api";
@@ -65,8 +65,13 @@ export function Bills() {
         </Card>
       )}
 
+      {isLoading && <Loading />}
       {!isLoading && bills.length === 0 && (
-        <EmptyState message="No bills yet. Add a recurring expense like rent or an EMI to track upcoming due dates." />
+        <EmptyState
+          title="Add your first bill"
+          message="Track a recurring expense like rent, an EMI, or a subscription to see upcoming due dates."
+          action={{ label: "+ Add bill", onClick: () => setShowAdd(true) }}
+        />
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

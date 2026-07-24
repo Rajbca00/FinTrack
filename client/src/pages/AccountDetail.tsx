@@ -10,7 +10,7 @@ import {
   useUpdateAccount,
   useUpdateGroup,
 } from "../hooks/useApi";
-import { Card, Button, Modal, Input, Label, Badge } from "../components/ui";
+import { Card, Button, Modal, Input, Label, Badge, EmptyState, Loading } from "../components/ui";
 import { ImportWizard } from "../components/ImportWizard";
 import { TransactionTable } from "../components/TransactionTable";
 import { AddTransactionModal } from "../components/AddTransactionModal";
@@ -40,7 +40,7 @@ export function AccountDetail() {
   const effectiveGroupId = activeGroupId ?? (account?.groups.length === 1 ? account.groups[0].id : undefined);
   const { data: txnData, isLoading } = useTransactions({ accountId: id, groupId: effectiveGroupId, pageSize: 100 });
 
-  if (!account) return <p className="text-sm text-ink-muted">Loading account…</p>;
+  if (!account) return <Loading label="Loading account…" />;
 
   return (
     <div className="flex flex-col gap-6">
@@ -119,8 +119,15 @@ export function AccountDetail() {
 
       <div>
         <h2 className="mb-2 text-sm font-semibold text-ink-secondary">Transactions</h2>
-        {isLoading && <p className="text-sm text-ink-muted">Loading…</p>}
-        {!isLoading && txnData && (
+        {isLoading && <Loading />}
+        {!isLoading && txnData && txnData.transactions.length === 0 && (
+          <EmptyState
+            title="Import your first statement"
+            message="Upload a CSV export from your bank or card to bring in transactions, or add one manually."
+            action={{ label: "Import statement", onClick: () => setShowImport(true) }}
+          />
+        )}
+        {!isLoading && txnData && txnData.transactions.length > 0 && (
           <TransactionTable
             transactions={txnData.transactions}
             categories={categories ?? []}

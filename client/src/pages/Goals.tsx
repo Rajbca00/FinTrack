@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useGoals, useCreateGoal, useUpdateGoal, useDeleteGoal, useAccounts, useAssets } from "../hooks/useApi";
-import { Card, Button, Modal, Input, Select, Label, EmptyState, ProgressBar } from "../components/ui";
+import { Card, Button, Modal, Input, Select, Label, EmptyState, ProgressBar, Loading } from "../components/ui";
 import { formatMoney, formatDate, toDateInputValue } from "../lib/format";
 import type { Goal } from "../lib/api";
 
@@ -22,8 +22,13 @@ export function Goals() {
         </Button>
       </div>
 
+      {isLoading && <Loading />}
       {!isLoading && (goals?.length ?? 0) === 0 && (
-        <EmptyState message="No goals yet. Add your first savings goal, like an emergency fund or vacation." />
+        <EmptyState
+          title="Add your first goal"
+          message="Set a savings target like an emergency fund, vacation, or home down payment and track progress here."
+          action={{ label: "+ Add goal", onClick: () => setShowAdd(true) }}
+        />
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

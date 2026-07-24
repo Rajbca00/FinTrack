@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Category, Group, Transaction } from "../lib/api";
 import { assignableCategories, getErrorMessage } from "../lib/api";
 import {
@@ -10,8 +10,9 @@ import {
   useBulkMoveGroup,
   useBulkDeleteTransactions,
 } from "../hooks/useApi";
-import { Button, Modal, Input, Select, Label } from "./ui";
+import { Button, Modal, Input, Select, Label, EmptyState, Toast } from "./ui";
 import { formatDate, formatMoney, groupDisplayName, toDateInputValue } from "../lib/format";
+import { TransactionAttachments } from "./TransactionAttachments";
 
 // The group dropdowns below need to disambiguate group names that repeat
 // once per account (e.g. every account has a "General" group) - callers that
@@ -44,9 +45,44 @@ export function TransactionTable({
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Deleting hides the row immediately and gives a few seconds to undo
+  // before the API call actually fires, instead of a confirm() dialog up
+  // front - only one pending delete at a time; starting a new one finalizes
+  // whatever was already pending.
+  const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
+  const pendingDeleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pendingDeleteTimer.current) clearTimeout(pendingDeleteTimer.current);
+    };
+  }, []);
+
+  function scheduleDelete(t: Transaction) {
+    if (pendingDelete && pendingDeleteTimer.current) {
+      clearTimeout(pendingDeleteTimer.current);
+      deleteTransaction.mutate(pendingDelete.id);
+    }
+    setPendingDelete(t);
+    pendingDeleteTimer.current = setTimeout(() => {
+      deleteTransaction.mutate(t.id);
+      setPendingDelete(null);
+    }, 5000);
+  }
+
+  function undoDelete() {
+    if (pendingDeleteTimer.current) clearTimeout(pendingDeleteTimer.current);
+    setPendingDelete(null);
+  }
+
+  const visibleTransactions = useMemo(
+    () => transactions.filter((t) => t.id !== pendingDelete?.id),
+    [transactions, pendingDelete]
+  );
+
   // Transfers can't be bulk-acted on (mirrors the single-row restrictions
   // below), so they're excluded from "select all" and can't be checked.
-  const selectableIds = useMemo(() => transactions.filter((t) => !t.isTransfer).map((t) => t.id), [transactions]);
+  const selectableIds = useMemo(() => visibleTransactions.filter((t) => !t.isTransfer).map((t) => t.id), [visibleTransactions]);
   const selectedCount = selectedIds.size;
   const allSelected = selectableIds.length > 0 && selectedIds.size === selectableIds.length;
 
@@ -68,7 +104,7 @@ export function TransactionTable({
   }
 
   if (transactions.length === 0) {
-    return <p className="py-8 text-center text-sm text-ink-muted">No transactions found.</p>;
+    return <EmptyState message="No transactions match these filters. Try widening the date range or clearing a filter." />;
   }
 
   return (
@@ -96,7 +132,7 @@ export function TransactionTable({
           actions) to reflow sensibly at that width, even with horizontal
           scroll, so it's a separate layout rather than a CSS-only reshuffle. */}
       <div className="flex flex-col gap-2.5 sm:hidden">
-        {transactions.map((t) => {
+        {visibleTransactions.map((t) => {
           const categoryColor = t.category?.color ?? "#898781";
           const categoryInitial = (t.category?.name ?? "?").slice(0, 1).toUpperCase();
           return (
@@ -175,12 +211,7 @@ export function TransactionTable({
                   Edit
                 </button>
                 {!t.isTransfer && (
-                  <button
-                    className="text-ink-muted hover:text-critical"
-                    onClick={() => {
-                      if (confirm("Delete this transaction?")) deleteTransaction.mutate(t.id);
-                    }}
-                  >
+                  <button className="text-ink-muted hover:text-critical" onClick={() => scheduleDelete(t)}>
                     Delete
                   </button>
                 )}
@@ -215,7 +246,7 @@ export function TransactionTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-hairline">
-            {transactions.map((t) => (
+            {visibleTransactions.map((t) => (
               <tr key={t.id} className="hover:bg-white/5">
                 <td className="px-4 py-2">
                   {!t.isTransfer && (
@@ -287,12 +318,7 @@ export function TransactionTable({
                   Edit
                 </Button>
                 {!t.isTransfer && (
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      if (confirm("Delete this transaction?")) deleteTransaction.mutate(t.id);
-                    }}
-                  >
+                  <Button variant="ghost" onClick={() => scheduleDelete(t)}>
                     Delete
                   </Button>
                 )}
@@ -302,6 +328,10 @@ export function TransactionTable({
         </tbody>
       </table>
       </div>
+
+      {pendingDelete && (
+        <Toast message={`Deleted "${pendingDelete.description}"`} actionLabel="Undo" onAction={undoDelete} />
+      )}
 
       {editing && (
         <EditTransactionModal
@@ -515,6 +545,7 @@ function EditTransactionModal({
           <Label>Notes</Label>
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" />
         </div>
+        <TransactionAttachments transactionId={transaction.id} />
         <Button
           className="mt-2"
           disabled={saving || (convertingToTransfer && (!transferToAccountId || !transferToGroupId || sameAccountAndGroup))}

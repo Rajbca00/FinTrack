@@ -453,6 +453,23 @@ export type MerchantIntelligence = {
 };
 export const getMerchantIntelligence = () => api.get<MerchantIntelligence>("/merchants/top").then((r) => r.data);
 
+// --- Attachments ---
+export type Attachment = {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+};
+export type AttachmentWithData = Attachment & { data: string };
+
+export const listAttachments = (transactionId: string) =>
+  api.get<Attachment[]>(`/transactions/${transactionId}/attachments`).then((r) => r.data);
+export const uploadAttachment = (transactionId: string, data: { filename: string; mimeType: string; data: string }) =>
+  api.post<Attachment>(`/transactions/${transactionId}/attachments`, data).then((r) => r.data);
+export const getAttachment = (id: string) => api.get<AttachmentWithData>(`/attachments/${id}`).then((r) => r.data);
+export const deleteAttachment = (id: string) => api.delete(`/attachments/${id}`);
+
 export type CategoryTrendMonth = { key: string; label: string };
 export type CategoryTrendRow = { categoryId: string; name: string; color: string | null; totals: number[]; total: number };
 export const getCategoryTrend = (params: {

@@ -429,3 +429,23 @@ export function useMerchantSuggestion(query: string) {
 export function useMerchantIntelligence() {
   return useQuery({ queryKey: ["merchantIntelligence"], queryFn: api.getMerchantIntelligence });
 }
+
+export function useAttachments(transactionId: string) {
+  return useQuery({ queryKey: ["attachments", transactionId], queryFn: () => api.listAttachments(transactionId) });
+}
+
+export function useUploadAttachment(transactionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { filename: string; mimeType: string; data: string }) => api.uploadAttachment(transactionId, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["attachments", transactionId] }),
+  });
+}
+
+export function useDeleteAttachment(transactionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteAttachment,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["attachments", transactionId] }),
+  });
+}

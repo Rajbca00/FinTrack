@@ -30,6 +30,7 @@ import {
 import { Card, Select, Label, ProgressBar, Badge } from "../components/ui";
 import { formatMoney, formatDate } from "../lib/format";
 import { CHROME, DIVERGING, categoricalColor } from "../lib/palette";
+import { usePersistentState } from "../hooks/usePersistentState";
 import type { Bill } from "../lib/api";
 
 type Period = "week" | "month" | "year";
@@ -47,16 +48,18 @@ export function Dashboard() {
   const budgetAlerts = useMemo(() => (budgets ?? []).filter((b) => b.amount > 0 && b.spent / b.amount >= 0.8), [budgets]);
   const { data: billData } = useBills();
   const { data: merchantIntel } = useMerchantIntelligence();
-  const [period, setPeriod] = useState<Period>("month");
-  const [accountId, setAccountId] = useState("");
+  // Persisted across reloads/navigation (see usePersistentState) so coming
+  // back to the Dashboard doesn't silently reset the view you'd set up.
+  const [period, setPeriod] = usePersistentState<Period>("fintrack.dashboard.period", "month");
+  const [accountId, setAccountId] = usePersistentState("fintrack.dashboard.accountId", "");
   // Filters the report sections (trend/breakdown/category-trend) below by
   // group *name* rather than a single group id, since a name like "General"
   // exists once per account - defaults to "General" so a Temple Fund-style
   // secondary group doesn't silently skew the main financial reports.
-  const [groupName, setGroupName] = useState("General");
+  const [groupName, setGroupName] = usePersistentState("fintrack.dashboard.groupName", "General");
   // Only meaningful when period === "month" - lets the charts narrow down to
   // one specific month instead of showing the whole transaction history.
-  const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedMonth, setSelectedMonth] = usePersistentState("fintrack.dashboard.selectedMonth", "");
 
   const groupNames = useMemo(() => {
     const names = new Set<string>();

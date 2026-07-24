@@ -21,6 +21,7 @@ import { goalsRouter } from "./routes/goals";
 import { budgetsRouter } from "./routes/budgets";
 import { billsRouter } from "./routes/bills";
 import { merchantsRouter } from "./routes/merchants";
+import { attachmentsRouter } from "./routes/attachments";
 
 export function createApp() {
   const app = express();
@@ -44,6 +45,7 @@ export function createApp() {
   app.use("/api/budgets", budgetsRouter);
   app.use("/api/bills", billsRouter);
   app.use("/api/merchants", merchantsRouter);
+  app.use("/api", attachmentsRouter);
 
   // In production this single Node service also serves the built React app,
   // so Render only needs one web service (no separate static site / CDN).

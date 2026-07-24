@@ -10,7 +10,7 @@ import {
   useDeleteLiability,
   useNetWorth,
 } from "../hooks/useApi";
-import { Card, Button, Modal, Input, Select, Label, EmptyState } from "../components/ui";
+import { Card, Button, Modal, Input, Select, Label, EmptyState, Loading } from "../components/ui";
 import { formatMoney, formatDate, toDateInputValue, ASSET_TYPE_LABELS, LIABILITY_TYPE_LABELS } from "../lib/format";
 import type { Asset, AssetType, Liability, LiabilityType } from "../lib/api";
 
@@ -69,8 +69,13 @@ export function NetWorth() {
             + Add asset
           </Button>
         </div>
+        {assetsLoading && <Loading />}
         {!assetsLoading && (assets?.length ?? 0) === 0 && (
-          <EmptyState message="No assets yet. Add your first fixed deposit, mutual fund, or other holding." />
+          <EmptyState
+            title="Add your first asset"
+            message="Fixed deposits, mutual funds, EPF/PPF, gold, and property all contribute to your net worth here."
+            action={{ label: "+ Add asset", onClick: () => setShowAddAsset(true) }}
+          />
         )}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {assets?.map((asset) => (
@@ -115,8 +120,13 @@ export function NetWorth() {
             + Add liability
           </Button>
         </div>
+        {liabilitiesLoading && <Loading />}
         {!liabilitiesLoading && (liabilities?.length ?? 0) === 0 && (
-          <EmptyState message="No liabilities yet. Add a home loan, personal loan, or other debt." />
+          <EmptyState
+            title="Add your first liability"
+            message="Track a home loan, personal loan, or other debt to see it reflected in your net worth."
+            action={{ label: "+ Add liability", onClick: () => setShowAddLiability(true) }}
+          />
         )}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {liabilities?.map((liability) => (
