@@ -1,14 +1,27 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import clsx from "clsx";
 
+// `primary: true` marks the handful of items that also get a slot in the
+// mobile bottom tab bar (which only has room for a few before it feels
+// cramped) - everything else still shows in the tab bar's "More" sheet and
+// in the desktop sidebar (which scales vertically, so it lists everything
+// flat regardless of this flag).
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", tabLabel: "Home", end: true, icon: IconHome },
-  { to: "/accounts", label: "Accounts", tabLabel: "Accounts", icon: IconBank },
-  { to: "/transactions", label: "Transactions", tabLabel: "Activity", icon: IconList },
-  { to: "/transfers", label: "Transfers", tabLabel: "Transfers", icon: IconSwap },
-  { to: "/categories", label: "Categories & Rules", tabLabel: "Categories", icon: IconTag },
+  { to: "/", label: "Dashboard", tabLabel: "Home", end: true, icon: IconHome, primary: true },
+  { to: "/net-worth", label: "Net Worth", tabLabel: "Net Worth", icon: IconTrendUp, primary: true },
+  { to: "/goals", label: "Goals", tabLabel: "Goals", icon: IconFlag, primary: false },
+  { to: "/budgets", label: "Budgets", tabLabel: "Budgets", icon: IconPie, primary: false },
+  { to: "/bills", label: "Bills", tabLabel: "Bills", icon: IconCalendar, primary: false },
+  { to: "/accounts", label: "Accounts", tabLabel: "Accounts", icon: IconBank, primary: true },
+  { to: "/transactions", label: "Transactions", tabLabel: "Activity", icon: IconList, primary: true },
+  { to: "/transfers", label: "Transfers", tabLabel: "Transfers", icon: IconSwap, primary: false },
+  { to: "/categories", label: "Categories & Rules", tabLabel: "Categories", icon: IconTag, primary: false },
+  { to: "/settings", label: "Settings", tabLabel: "Settings", icon: IconGear, primary: false },
 ];
+
+const mobilePrimaryItems = NAV_ITEMS.filter((i) => i.primary);
+const mobileOverflowItems = NAV_ITEMS.filter((i) => !i.primary);
 
 const STORAGE_KEY = "fintrack.sidebarCollapsed";
 
@@ -16,10 +29,16 @@ export function Layout() {
   // Icon-rail collapse, desktop only - the mobile bottom tab bar replaces
   // the sidebar entirely below md, so collapsing has nothing to do there.
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(STORAGE_KEY) === "1");
+  const [showMore, setShowMore] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, collapsed ? "1" : "0");
   }, [collapsed]);
+
+  useEffect(() => {
+    setShowMore(false);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen md:flex">
@@ -71,11 +90,47 @@ export function Layout() {
         <Outlet />
       </main>
 
+      {showMore && (
+        <div className="fixed inset-0 z-40 flex items-end bg-black/60 md:hidden" onClick={() => setShowMore(false)}>
+          <div
+            className="w-full rounded-t-2xl border-t border-hairline bg-surface p-4 pb-8"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">More</h2>
+              <button onClick={() => setShowMore(false)} className="text-ink-muted hover:text-ink" aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <div className="flex flex-col gap-1">
+              {mobileOverflowItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  onClick={() => setShowMore(false)}
+                  className={({ isActive }) =>
+                    clsx(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium",
+                      isActive ? "bg-brand/15 text-brand" : "text-ink-secondary hover:bg-white/5 hover:text-ink"
+                    )
+                  }
+                >
+                  <item.icon className="h-5 w-5 shrink-0" />
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <nav
         className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-hairline bg-surface/95 backdrop-blur md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        {NAV_ITEMS.map((item) => (
+        {mobilePrimaryItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -91,6 +146,18 @@ export function Layout() {
             <span>{item.tabLabel}</span>
           </NavLink>
         ))}
+        {mobileOverflowItems.length > 0 && (
+          <button
+            onClick={() => setShowMore(true)}
+            className={clsx(
+              "flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium",
+              mobileOverflowItems.some((i) => i.to === location.pathname) ? "text-brand" : "text-ink-muted"
+            )}
+          >
+            <IconMore className="h-5 w-5" />
+            <span>More</span>
+          </button>
+        )}
       </nav>
     </div>
   );
@@ -111,6 +178,64 @@ function IconHome({ className }: IconProps) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 11.5 12 4l9 7.5" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9" />
+    </svg>
+  );
+}
+
+function IconTrendUp({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 17 9 11l4 4 8-8" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 7h6v6" />
+    </svg>
+  );
+}
+
+function IconFlag({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 21V4" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 4h13l-3 4 3 4H5" />
+    </svg>
+  );
+}
+
+function IconMore({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <circle cx="5" cy="12" r="1.75" />
+      <circle cx="12" cy="12" r="1.75" />
+      <circle cx="19" cy="12" r="1.75" />
+    </svg>
+  );
+}
+
+function IconPie({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v9l7.5 4.3A9 9 0 1 1 12 3Z" />
+    </svg>
+  );
+}
+
+function IconCalendar({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path strokeLinecap="round" d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
+  );
+}
+
+function IconGear({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+      <circle cx="12" cy="12" r="3" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+      />
     </svg>
   );
 }

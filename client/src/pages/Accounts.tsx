@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAccounts, useCreateAccount, useBalances, useArchiveAccount } from "../hooks/useApi";
-import { Card, Button, Modal, Input, Select, Label, Badge, EmptyState } from "../components/ui";
+import { Card, Button, Modal, Input, Select, Label, Badge, EmptyState, Loading } from "../components/ui";
 import { formatMoney } from "../lib/format";
 import type { AccountType } from "../lib/api";
 
@@ -24,8 +24,14 @@ export function Accounts() {
         <Button onClick={() => setShowCreate(true)}>+ Add account</Button>
       </div>
 
-      {isLoading && <p className="text-sm text-ink-muted">Loading…</p>}
-      {!isLoading && accounts?.length === 0 && <EmptyState message="No accounts yet. Add your first bank account or credit card." />}
+      {isLoading && <Loading />}
+      {!isLoading && accounts?.length === 0 && (
+        <EmptyState
+          title="Add your first account"
+          message="Track a bank account or credit card to start seeing balances and transactions."
+          action={{ label: "+ Add account", onClick: () => setShowCreate(true) }}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {accounts?.map((account) => {

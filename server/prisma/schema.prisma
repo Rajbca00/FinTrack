@@ -14,6 +14,8 @@ datasource db {
 //   CategoryType: INCOME | EXPENSE | TRANSFER
 //   MatchType:    CONTAINS | STARTS_WITH | REGEX | EXACT
 //   TransferType: ACCOUNT_TRANSFER | GROUP_REALLOCATION
+//   AssetType:    FIXED_DEPOSIT | MUTUAL_FUND | EPF | PPF | GOLD | CASH | REAL_ESTATE | VEHICLE | CRYPTO | OTHER
+//   LiabilityType: HOME_LOAN | PERSONAL_LOAN | GOLD_LOAN | VEHICLE_LOAN | CREDIT_CARD | OTHER
 
 // A bank account or credit card. Balances are never stored directly on the
 // account - they are derived from the opening balances + transactions of
@@ -39,6 +41,7 @@ model Account {
   groups        Group[]
   transactions  Transaction[]
   importBatches ImportBatch[]
+  goals         Goal[]
 }
 
 // A fund/purpose flag scoped to one account, e.g. "Personal" and
@@ -72,6 +75,8 @@ model Category {
   children     Category[]     @relation("CategoryHierarchy")
   rules        CategoryRule[]
   transactions Transaction[]
+  budgets      Budget[]
+  bills        Bill[]
 }
 
 model CategoryRule {
@@ -105,6 +110,7 @@ model Transaction {
   importBatchId  String?
   importBatch    ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   dedupeKey      String?      // hash of date+description+amount, used to skip duplicate imports
+  attachments    Attachment[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -112,6 +118,23 @@ model Transaction {
   @@index([groupId])
   @@index([categoryId])
   @@unique([accountId, dedupeKey])
+}
+
+// A receipt/invoice/photo/PDF attached to a transaction, for reimbursements
+// and audits. Stored as base64 directly in Postgres (capped at ~5MB raw) -
+// there's no blob storage wired up for this app, and a personal finance
+// tool's receipt volume doesn't warrant standing one up yet. If that
+// changes, `data` can become a URL instead without touching callers that
+// only care about filename/mimeType/size for the list view.
+model Attachment {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  filename      String
+  mimeType      String
+  size          Int
+  data          String
+  createdAt     DateTime    @default(now())
 }
 
 // One Transfer groups the 2 Transaction legs it creates - either moving
@@ -136,4 +159,111 @@ model ImportBatch {
   rowCount          Int
   skippedDuplicates Int           @default(0)
   transactions      Transaction[]
+}
+
+// A non-transactional holding that contributes to net worth - fixed deposits,
+// mutual funds, EPF/PPF, gold, real estate, etc. Unlike Account/Transaction,
+// there's no ledger here: currentValue is just overwritten as the user (or,
+// later, a market-data sync) refreshes it. updatedAt doubles as "last updated".
+model Asset {
+  id            String   @id @default(cuid())
+  name          String
+  type          String
+  currentValue  Float
+  purchaseValue Float?
+  notes         String?
+  archived      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  goals         Goal[]
+}
+
+// A loan or other debt tracked outside the Account model (which already
+// covers credit cards with transaction-level detail). Contributes negatively
+// to net worth alongside credit card account balances.
+model Liability {
+  id                 String    @id @default(cuid())
+  name               String
+  type               String
+  outstandingBalance Float
+  interestRate       Float?
+  emiAmount          Float?
+  nextDueDate        DateTime?
+  lender             String?
+  notes              String?
+  archived           Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+// A recurring spending limit for one category - amount is the limit for
+// whatever period is chosen; "spent" for the current period is computed on
+// read from Transactions rather than stored, so editing the amount just
+// changes the limit going forward without needing per-month rows (mirrors
+// how Asset.currentValue is a single live figure, not a ledger).
+model Budget {
+  id         String   @id @default(cuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  amount     Float
+  period     String   @default("MONTHLY")
+  archived   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// A recurring expense (EMI, insurance, rent, subscription) tracked so the
+// Dashboard can surface what's coming up. nextDueDate is rolled forward by
+// `recurrence` on read once it's in the past (see services/bills.ts) - same
+// upsert-on-read shape as NetWorthSnapshot - so there's no cron keeping it
+// current and no risk of it silently going stale.
+model Bill {
+  id           String    @id @default(cuid())
+  name         String
+  amount       Float
+  categoryId   String?
+  category     Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  nextDueDate  DateTime
+  recurrence   String    @default("MONTHLY")
+  autoDetected Boolean   @default(false)
+  archived     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// A savings target the user is tracking towards (emergency fund, vacation,
+// home down payment, etc). currentAmount is a manually-updated figure like
+// Asset.currentValue - the optional linkedAccount/linkedAsset is just a
+// reference shown alongside the goal (e.g. "tracked via this FD"), not an
+// auto-synced balance, so progress stays predictable even if the linked
+// entity is later archived or its balance moves for unrelated reasons.
+model Goal {
+  id              String    @id @default(cuid())
+  name            String
+  targetAmount    Float
+  currentAmount   Float     @default(0)
+  targetDate      DateTime?
+  linkedAccountId String?
+  linkedAccount   Account?  @relation(fields: [linkedAccountId], references: [id], onDelete: SetNull)
+  linkedAssetId   String?
+  linkedAsset     Asset?    @relation(fields: [linkedAssetId], references: [id], onDelete: SetNull)
+  archived        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// One row per calendar day the net worth breakdown was computed, upserted
+// on read (see services/netWorth.ts) rather than on a cron - this is what
+// powers the Net Worth Trend chart, and it builds up history organically
+// from the day this feature shipped without needing a scheduler.
+model NetWorthSnapshot {
+  id           String   @id @default(cuid())
+  date         DateTime @unique
+  cashAndBank  Float
+  investments  Float
+  retirement   Float
+  otherAssets  Float
+  liabilities  Float
+  netWorth     Float
+  createdAt    DateTime @default(now())
 }

@@ -176,6 +176,8 @@ export type TransactionListParams = {
   from?: string;
   to?: string;
   q?: string;
+  minAmount?: number;
+  maxAmount?: number;
   page?: number;
   pageSize?: number;
 };
@@ -286,6 +288,191 @@ export const getBreakdown = (params: {
   type: "INCOME" | "EXPENSE";
 }) => api.get<BreakdownPoint[]>("/summary/breakdown", { params }).then((r) => r.data);
 export const getBalances = () => api.get<AccountBalance[]>("/summary/balances").then((r) => r.data);
+
+// --- Assets ---
+export type AssetType =
+  | "FIXED_DEPOSIT"
+  | "MUTUAL_FUND"
+  | "EPF"
+  | "PPF"
+  | "GOLD"
+  | "CASH"
+  | "REAL_ESTATE"
+  | "VEHICLE"
+  | "CRYPTO"
+  | "OTHER";
+
+export type Asset = {
+  id: string;
+  name: string;
+  type: AssetType;
+  currentValue: number;
+  purchaseValue: number | null;
+  notes: string | null;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const listAssets = () => api.get<Asset[]>("/assets").then((r) => r.data);
+export const createAsset = (data: Partial<Asset>) => api.post<Asset>("/assets", data).then((r) => r.data);
+export const updateAsset = (id: string, data: Partial<Asset>) => api.put<Asset>(`/assets/${id}`, data).then((r) => r.data);
+export const deleteAsset = (id: string) => api.delete(`/assets/${id}`);
+
+// --- Liabilities ---
+export type LiabilityType = "HOME_LOAN" | "PERSONAL_LOAN" | "GOLD_LOAN" | "VEHICLE_LOAN" | "CREDIT_CARD" | "OTHER";
+
+export type Liability = {
+  id: string;
+  name: string;
+  type: LiabilityType;
+  outstandingBalance: number;
+  interestRate: number | null;
+  emiAmount: number | null;
+  nextDueDate: string | null;
+  lender: string | null;
+  notes: string | null;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const listLiabilities = () => api.get<Liability[]>("/liabilities").then((r) => r.data);
+export const createLiability = (data: Partial<Liability>) => api.post<Liability>("/liabilities", data).then((r) => r.data);
+export const updateLiability = (id: string, data: Partial<Liability>) =>
+  api.put<Liability>(`/liabilities/${id}`, data).then((r) => r.data);
+export const deleteLiability = (id: string) => api.delete(`/liabilities/${id}`);
+
+// --- Net worth ---
+export type NetWorthBreakdown = {
+  cashAndBank: number;
+  investments: number;
+  retirement: number;
+  otherAssets: number;
+  liabilities: number;
+  netWorth: number;
+};
+export type NetWorthTrendPoint = NetWorthBreakdown & { date: string };
+
+export const getNetWorth = () => api.get<NetWorthBreakdown>("/summary/net-worth").then((r) => r.data);
+export const getNetWorthTrend = () => api.get<NetWorthTrendPoint[]>("/summary/net-worth/trend").then((r) => r.data);
+
+// --- Goals ---
+export type Goal = {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate: string | null;
+  linkedAccountId: string | null;
+  linkedAccount?: Account | null;
+  linkedAssetId: string | null;
+  linkedAsset?: Asset | null;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const listGoals = () => api.get<Goal[]>("/goals").then((r) => r.data);
+export const createGoal = (data: Partial<Goal>) => api.post<Goal>("/goals", data).then((r) => r.data);
+export const updateGoal = (id: string, data: Partial<Goal>) => api.put<Goal>(`/goals/${id}`, data).then((r) => r.data);
+export const deleteGoal = (id: string) => api.delete(`/goals/${id}`);
+
+// --- Budgets ---
+export type BudgetPeriod = "MONTHLY" | "QUARTERLY" | "YEARLY";
+
+export type Budget = {
+  id: string;
+  categoryId: string;
+  category?: Category;
+  amount: number;
+  period: BudgetPeriod;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  spent: number;
+  periodStart: string;
+  periodEnd: string;
+};
+
+export const listBudgets = () => api.get<Budget[]>("/budgets").then((r) => r.data);
+export const createBudget = (data: { categoryId: string; amount: number; period: BudgetPeriod }) =>
+  api.post<Budget>("/budgets", data).then((r) => r.data);
+export const updateBudget = (id: string, data: Partial<{ categoryId: string; amount: number; period: BudgetPeriod }>) =>
+  api.put<Budget>(`/budgets/${id}`, data).then((r) => r.data);
+export const deleteBudget = (id: string) => api.delete(`/budgets/${id}`);
+
+// --- Bills ---
+export type BillRecurrence = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY";
+
+export type Bill = {
+  id: string;
+  name: string;
+  amount: number;
+  categoryId: string | null;
+  category?: Category | null;
+  nextDueDate: string;
+  recurrence: BillRecurrence;
+  autoDetected: boolean;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BillGroups = { dueToday: Bill[]; dueThisWeek: Bill[]; dueThisMonth: Bill[]; later: Bill[] };
+
+export const listBills = () => api.get<{ bills: Bill[]; groups: BillGroups }>("/bills").then((r) => r.data);
+export const createBill = (data: Partial<Bill>) => api.post<Bill>("/bills", data).then((r) => r.data);
+export const updateBill = (id: string, data: Partial<Bill>) => api.put<Bill>(`/bills/${id}`, data).then((r) => r.data);
+export const deleteBill = (id: string) => api.delete(`/bills/${id}`);
+
+export type BillSuggestion = {
+  description: string;
+  amount: number;
+  occurrences: number;
+  categoryId: string | null;
+  suggestedNextDueDate: string;
+};
+export const getBillSuggestions = () => api.get<BillSuggestion[]>("/bills/suggestions").then((r) => r.data);
+
+// --- Merchant intelligence ---
+export type MerchantSuggestion = {
+  categoryId: string | null;
+  accountId: string | null;
+  groupId: string | null;
+  matchCount: number;
+} | null;
+
+export const suggestMerchant = (q: string) => api.get<MerchantSuggestion>("/merchants/suggest", { params: { q } }).then((r) => r.data);
+
+export type MerchantStat = { name: string; count: number; total: number };
+export type MerchantIntelligence = {
+  topMerchants: MerchantStat[];
+  topCategories: (MerchantStat & { color: string | null })[];
+  topExpenses: MerchantStat[];
+};
+export const getMerchantIntelligence = () => api.get<MerchantIntelligence>("/merchants/top").then((r) => r.data);
+
+// --- Attachments ---
+export type Attachment = {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+};
+export type AttachmentWithData = Attachment & { data: string };
+
+export const listAttachments = (transactionId: string) =>
+  api.get<Attachment[]>(`/transactions/${transactionId}/attachments`).then((r) => r.data);
+export const uploadAttachment = (transactionId: string, data: { filename: string; mimeType: string; data: string }) =>
+  api.post<Attachment>(`/transactions/${transactionId}/attachments`, data).then((r) => r.data);
+export const getAttachment = (id: string) => api.get<AttachmentWithData>(`/attachments/${id}`).then((r) => r.data);
+export const deleteAttachment = (id: string) => api.delete(`/attachments/${id}`);
+
+// --- Settings / backup ---
+export const exportData = () => api.get<Record<string, unknown>>("/settings/export").then((r) => r.data);
+export const importData = (payload: Record<string, unknown>) => api.post("/settings/import", payload);
 
 export type CategoryTrendMonth = { key: string; label: string };
 export type CategoryTrendRow = { categoryId: string; name: string; color: string | null; totals: number[]; total: number };

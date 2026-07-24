@@ -10,7 +10,7 @@ import {
   useDeleteRule,
   useApplyRules,
 } from "../hooks/useApi";
-import { Card, Button, Modal, Input, Select, Label, Badge } from "../components/ui";
+import { Card, Button, Modal, Input, Select, Label, Badge, EmptyState } from "../components/ui";
 import { assignableCategories } from "../lib/api";
 import type { AmountSign, Category, CategoryRule, CategoryType, MatchType } from "../lib/api";
 
@@ -117,7 +117,13 @@ export function Categories() {
               ))}
             </tbody>
           </table>
-          {(rules?.length ?? 0) === 0 && <p className="p-6 text-center text-sm text-ink-muted">No rules yet.</p>}
+          {(rules?.length ?? 0) === 0 && (
+            <EmptyState
+              title="Add your first rule"
+              message="Auto-categorization rules run whenever a transaction is imported or added, so future statements need less manual cleanup."
+              action={{ label: "+ Add rule", onClick: () => setShowAddRule(true) }}
+            />
+          )}
         </Card>
       </div>
 

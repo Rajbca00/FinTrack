@@ -13,6 +13,12 @@ const listQuerySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
   q: z.string().optional(),
+  // Applied to the amount's magnitude (not the signed value) so "above 1000"
+  // matches an expense of -1500 as well as an income of 1500 - see the
+  // natural-language search parser on the client, which is the only caller
+  // that currently sets these.
+  minAmount: z.coerce.number().optional(),
+  maxAmount: z.coerce.number().optional(),
   page: z.coerce.number().min(1).default(1),
   pageSize: z.coerce.number().min(1).max(200).default(50),
 });
@@ -20,7 +26,7 @@ const listQuerySchema = z.object({
 transactionsRouter.get("/", async (req, res) => {
   const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { accountId, groupId, categoryId, type, from, to, q, page, pageSize } = parsed.data;
+  const { accountId, groupId, categoryId, type, from, to, q, minAmount, maxAmount, page, pageSize } = parsed.data;
 
   // "uncategorized" is a client-side sentinel for categoryId: null (the
   // real "no category" state - see categorize()'s null return), not an
@@ -33,7 +39,9 @@ transactionsRouter.get("/", async (req, res) => {
     categoryId: categoryId === "uncategorized" ? null : categoryId,
     ...(type ? { isTransfer: false, amount: type === "INCOME" ? { gte: 0 } : { lt: 0 } } : {}),
     date: from || to ? { gte: from ? new Date(from) : undefined, lte: to ? new Date(to) : undefined } : undefined,
-    description: q ? { contains: q } : undefined,
+    description: q ? { contains: q, mode: "insensitive" as const } : undefined,
+    ...(minAmount !== undefined ? { OR: [{ amount: { gte: minAmount } }, { amount: { lte: -minAmount } }] } : {}),
+    ...(maxAmount !== undefined ? { amount: { gte: -maxAmount, lte: maxAmount } } : {}),
   };
 
   const [total, transactions] = await Promise.all([

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { format, subMonths } from "date-fns";
 import {
   Bar,
@@ -6,15 +7,31 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { useAccounts, useBalances, useBreakdown, useCategoryTrend, useTrend } from "../hooks/useApi";
-import { Card, Select, Label } from "../components/ui";
-import { formatMoney } from "../lib/format";
+import {
+  useAccounts,
+  useBalances,
+  useBills,
+  useBreakdown,
+  useBudgets,
+  useCategoryTrend,
+  useGoals,
+  useMerchantIntelligence,
+  useNetWorth,
+  useNetWorthTrend,
+  useTrend,
+} from "../hooks/useApi";
+import { Card, Select, Label, ProgressBar, Badge } from "../components/ui";
+import { formatMoney, formatDate } from "../lib/format";
 import { CHROME, DIVERGING, categoricalColor } from "../lib/palette";
+import { usePersistentState } from "../hooks/usePersistentState";
+import type { Bill } from "../lib/api";
 
 type Period = "week" | "month" | "year";
 
@@ -24,16 +41,25 @@ export function Dashboard() {
 
   const { data: accounts } = useAccounts();
   const { data: balances } = useBalances();
-  const [period, setPeriod] = useState<Period>("month");
-  const [accountId, setAccountId] = useState("");
+  const { data: netWorth } = useNetWorth();
+  const { data: netWorthTrend } = useNetWorthTrend();
+  const { data: goals } = useGoals();
+  const { data: budgets } = useBudgets();
+  const budgetAlerts = useMemo(() => (budgets ?? []).filter((b) => b.amount > 0 && b.spent / b.amount >= 0.8), [budgets]);
+  const { data: billData } = useBills();
+  const { data: merchantIntel } = useMerchantIntelligence();
+  // Persisted across reloads/navigation (see usePersistentState) so coming
+  // back to the Dashboard doesn't silently reset the view you'd set up.
+  const [period, setPeriod] = usePersistentState<Period>("fintrack.dashboard.period", "month");
+  const [accountId, setAccountId] = usePersistentState("fintrack.dashboard.accountId", "");
   // Filters the report sections (trend/breakdown/category-trend) below by
   // group *name* rather than a single group id, since a name like "General"
   // exists once per account - defaults to "General" so a Temple Fund-style
   // secondary group doesn't silently skew the main financial reports.
-  const [groupName, setGroupName] = useState("General");
+  const [groupName, setGroupName] = usePersistentState("fintrack.dashboard.groupName", "General");
   // Only meaningful when period === "month" - lets the charts narrow down to
   // one specific month instead of showing the whole transaction history.
-  const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedMonth, setSelectedMonth] = usePersistentState("fintrack.dashboard.selectedMonth", "");
 
   const groupNames = useMemo(() => {
     const names = new Set<string>();
@@ -225,6 +251,138 @@ export function Dashboard() {
         </div>
       </Card>
 
+      <Card className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-xs font-medium text-ink-muted">Net Worth</p>
+            <p className={`text-3xl font-semibold ${(netWorth?.netWorth ?? 0) < 0 ? "text-critical" : "text-ink"}`}>
+              {formatMoney(netWorth?.netWorth ?? 0)}
+            </p>
+          </div>
+          <Link to="/net-worth" className="text-sm font-medium text-brand hover:underline">
+            Manage assets & liabilities →
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-4 border-t border-hairline pt-4 sm:grid-cols-5">
+          <div>
+            <p className="text-xs text-ink-muted">Cash & Bank</p>
+            <p className="text-sm font-semibold text-ink">{formatMoney(netWorth?.cashAndBank ?? 0)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-ink-muted">Investments</p>
+            <p className="text-sm font-semibold text-ink">{formatMoney(netWorth?.investments ?? 0)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-ink-muted">Retirement</p>
+            <p className="text-sm font-semibold text-ink">{formatMoney(netWorth?.retirement ?? 0)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-ink-muted">Other Assets</p>
+            <p className="text-sm font-semibold text-ink">{formatMoney(netWorth?.otherAssets ?? 0)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-ink-muted">Liabilities</p>
+            <p className="text-sm font-semibold text-critical">{formatMoney(netWorth?.liabilities ?? 0)}</p>
+          </div>
+        </div>
+        {(netWorthTrend?.length ?? 0) > 1 && (
+          <div className="border-t border-hairline pt-4">
+            <p className="mb-2 text-xs font-semibold text-ink-secondary">Net Worth Trend</p>
+            <ResponsiveContainer width="100%" height={160}>
+              <LineChart data={netWorthTrend}>
+                <CartesianGrid vertical={false} stroke={chrome.gridline} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: chrome.mutedInk, fontSize: 11 }}
+                  axisLine={{ stroke: chrome.baseline }}
+                  tickLine={false}
+                  tickFormatter={(v) => formatDate(v)}
+                />
+                <YAxis tick={{ fill: chrome.mutedInk, fontSize: 11 }} axisLine={false} tickLine={false} width={70} tickFormatter={(v) => formatMoney(v)} />
+                <Tooltip
+                  content={<ChartTooltip currency="INR" />}
+                  labelFormatter={(v) => formatDate(String(v))}
+                  cursor={{ stroke: chrome.gridline }}
+                />
+                <Line type="monotone" dataKey="netWorth" name="Net Worth" stroke={diverging.positive} strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </Card>
+
+      {(goals?.length ?? 0) > 0 && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink-secondary">Active goals</h2>
+            <Link to="/goals" className="text-sm font-medium text-brand hover:underline">
+              View all →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {goals?.map((goal) => {
+              const pct = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
+              return (
+                <Card key={goal.id} className="flex flex-col gap-2">
+                  <p className="font-medium text-ink">{goal.name}</p>
+                  <div className="flex items-baseline justify-between">
+                    <p className="text-sm font-semibold text-ink">{formatMoney(goal.currentAmount)}</p>
+                    <p className="text-xs text-ink-muted">of {formatMoney(goal.targetAmount)}</p>
+                  </div>
+                  <ProgressBar value={pct} color={pct >= 100 ? "var(--color-good)" : undefined} />
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {budgetAlerts.length > 0 && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink-secondary">Budget alerts</h2>
+            <Link to="/budgets" className="text-sm font-medium text-brand hover:underline">
+              View all →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {budgetAlerts.map((budget) => {
+              const pct = (budget.spent / budget.amount) * 100;
+              const over = budget.spent > budget.amount;
+              return (
+                <Card key={budget.id} className="flex flex-col gap-2">
+                  <Badge color={budget.category?.color}>{budget.category?.name}</Badge>
+                  <div className="flex items-baseline justify-between">
+                    <p className={`text-sm font-semibold ${over ? "text-critical" : "text-ink"}`}>{formatMoney(budget.spent)}</p>
+                    <p className="text-xs text-ink-muted">of {formatMoney(budget.amount)}</p>
+                  </div>
+                  <ProgressBar value={pct} color={over ? "var(--color-critical)" : "#e0a020"} />
+                  <p className={`text-xs ${over ? "text-critical" : "text-ink-muted"}`}>
+                    {over ? "Over budget" : "Nearing budget limit"}
+                  </p>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {((billData?.groups.dueToday.length ?? 0) + (billData?.groups.dueThisWeek.length ?? 0) + (billData?.groups.dueThisMonth.length ?? 0)) > 0 && (
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink-secondary">Upcoming bills</h2>
+            <Link to="/bills" className="text-sm font-medium text-brand hover:underline">
+              View all →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <BillGroupColumn title="Due today" bills={billData?.groups.dueToday ?? []} />
+            <BillGroupColumn title="Due this week" bills={billData?.groups.dueThisWeek ?? []} />
+            <BillGroupColumn title="Due this month" bills={billData?.groups.dueThisMonth ?? []} />
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total balance" value={formatMoney(totalBalance)} />
         <StatCard label={`Income (${currentPeriod?.label ?? "this period"})`} value={formatMoney(income)} tone="good" />
@@ -391,6 +549,66 @@ export function Dashboard() {
           ))}
         </div>
       </div>
+
+      {merchantIntel && (merchantIntel.topMerchants.length > 0 || merchantIntel.topCategories.length > 0) && (
+        <div>
+          <h2 className="mb-2 text-sm font-semibold text-ink-secondary">Merchant insights</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Card>
+              <p className="mb-2 text-xs font-medium text-ink-muted">Top merchants</p>
+              <ul className="flex flex-col gap-1.5 text-sm">
+                {merchantIntel.topMerchants.map((m) => (
+                  <li key={m.name} className="flex items-center justify-between">
+                    <span className="truncate text-ink-secondary">{m.name}</span>
+                    <span className="shrink-0 pl-2 text-xs text-ink-muted">{m.count}×</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+            <Card>
+              <p className="mb-2 text-xs font-medium text-ink-muted">Most frequent categories</p>
+              <ul className="flex flex-col gap-1.5 text-sm">
+                {merchantIntel.topCategories.map((c) => (
+                  <li key={c.name} className="flex items-center justify-between">
+                    <Badge color={c.color}>{c.name}</Badge>
+                    <span className="shrink-0 pl-2 text-xs text-ink-muted">{c.count}×</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+            <Card>
+              <p className="mb-2 text-xs font-medium text-ink-muted">Most frequent expenses</p>
+              <ul className="flex flex-col gap-1.5 text-sm">
+                {merchantIntel.topExpenses.map((m) => (
+                  <li key={m.name} className="flex items-center justify-between">
+                    <span className="truncate text-ink-secondary">{m.name}</span>
+                    <span className="shrink-0 pl-2 text-xs font-medium text-ink">{formatMoney(m.total)}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BillGroupColumn({ title, bills }: { title: string; bills: Bill[] }) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-medium text-ink-muted">
+        {title} ({bills.length})
+      </p>
+      {bills.length === 0 && <p className="text-xs text-ink-muted">Nothing due</p>}
+      <ul className="flex flex-col gap-1.5">
+        {bills.map((b) => (
+          <li key={b.id} className="flex items-center justify-between text-sm">
+            <span className="text-ink-secondary">{b.name}</span>
+            <span className="font-medium text-ink">{formatMoney(b.amount)}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

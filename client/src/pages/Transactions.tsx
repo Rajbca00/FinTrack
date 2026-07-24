@@ -1,35 +1,47 @@
 import { useMemo, useState } from "react";
 import { useAccounts, useCategories, useTransactions, useApplyRules } from "../hooks/useApi";
+import { usePersistentState } from "../hooks/usePersistentState";
 import { TransactionTable } from "../components/TransactionTable";
 import { AddTransactionModal } from "../components/AddTransactionModal";
-import { Card, Button, Select, Input, Label } from "../components/ui";
+import { Card, Button, Select, Input, Label, Loading } from "../components/ui";
 import { assignableCategories } from "../lib/api";
 import { groupDisplayName } from "../lib/format";
+import { parseSearchQuery } from "../lib/search";
 
 export function Transactions() {
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
-  const [accountId, setAccountId] = useState("");
-  const [groupId, setGroupId] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [type, setType] = useState<"" | "INCOME" | "EXPENSE">("");
-  const [q, setQ] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  // Filters persist across reloads/navigation (see usePersistentState) so
+  // coming back to this page doesn't silently drop what you were looking at.
+  const [accountId, setAccountId] = usePersistentState("fintrack.transactions.accountId", "");
+  const [groupId, setGroupId] = usePersistentState("fintrack.transactions.groupId", "");
+  const [categoryId, setCategoryId] = usePersistentState("fintrack.transactions.categoryId", "");
+  const [type, setType] = usePersistentState<"" | "INCOME" | "EXPENSE">("fintrack.transactions.type", "");
+  const [q, setQ] = usePersistentState("fintrack.transactions.q", "");
+  const [from, setFrom] = usePersistentState("fintrack.transactions.from", "");
+  const [to, setTo] = usePersistentState("fintrack.transactions.to", "");
   const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
   const applyRules = useApplyRules();
 
   const selectedAccount = accounts?.find((a) => a.id === accountId);
 
+  // The search box supports natural language ("fuel last month", "groceries
+  // above 1000") on top of the explicit filters below - explicit From/To
+  // date pickers win over a parsed date phrase if the user has set both,
+  // since that's a deliberate, visible choice rather than a typed guess.
+  const parsedSearch = useMemo(() => parseSearchQuery(q), [q]);
+
   const { data, isLoading } = useTransactions({
     accountId: accountId || undefined,
     groupId: groupId || undefined,
     categoryId: categoryId || undefined,
     type: type || undefined,
-    q: q || undefined,
-    from: from || undefined,
-    to: to || undefined,
+    q: parsedSearch.text || undefined,
+    from: from || parsedSearch.from || undefined,
+    to: to || parsedSearch.to || undefined,
+    minAmount: parsedSearch.minAmount,
+    maxAmount: parsedSearch.maxAmount,
     page,
     pageSize: 50,
   });
@@ -120,11 +132,18 @@ export function Transactions() {
         </div>
         <div>
           <Label>Search</Label>
-          <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Description contains…" />
+          <Input
+            value={q}
+            onChange={(e) => { setQ(e.target.value); setPage(1); }}
+            placeholder='Try "fuel last month" or "groceries above 1000"'
+          />
+          {parsedSearch.recognized.length > 0 && (
+            <p className="mt-1 text-xs text-ink-muted">Understood: {parsedSearch.recognized.join(", ")}</p>
+          )}
         </div>
       </Card>
 
-      {isLoading && <p className="text-sm text-ink-muted">Loading…</p>}
+      {isLoading && <Loading />}
       {data && (
         <>
           <TransactionTable

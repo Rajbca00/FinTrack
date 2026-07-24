@@ -259,3 +259,193 @@ export function useCategoryTrend(params: {
 }) {
   return useQuery({ queryKey: ["categoryTrend", params], queryFn: () => api.getCategoryTrend(params) });
 }
+
+export function useAssets() {
+  return useQuery({ queryKey: ["assets"], queryFn: api.listAssets });
+}
+
+export function useCreateAsset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createAsset,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["assets"] });
+      qc.invalidateQueries({ queryKey: ["netWorth"] });
+    },
+  });
+}
+
+export function useUpdateAsset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<api.Asset> }) => api.updateAsset(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["assets"] });
+      qc.invalidateQueries({ queryKey: ["netWorth"] });
+    },
+  });
+}
+
+export function useDeleteAsset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteAsset,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["assets"] });
+      qc.invalidateQueries({ queryKey: ["netWorth"] });
+    },
+  });
+}
+
+export function useLiabilities() {
+  return useQuery({ queryKey: ["liabilities"], queryFn: api.listLiabilities });
+}
+
+export function useCreateLiability() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createLiability,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["liabilities"] });
+      qc.invalidateQueries({ queryKey: ["netWorth"] });
+    },
+  });
+}
+
+export function useUpdateLiability() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<api.Liability> }) => api.updateLiability(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["liabilities"] });
+      qc.invalidateQueries({ queryKey: ["netWorth"] });
+    },
+  });
+}
+
+export function useDeleteLiability() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteLiability,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["liabilities"] });
+      qc.invalidateQueries({ queryKey: ["netWorth"] });
+    },
+  });
+}
+
+export function useNetWorth() {
+  return useQuery({ queryKey: ["netWorth"], queryFn: api.getNetWorth });
+}
+
+export function useNetWorthTrend() {
+  return useQuery({ queryKey: ["netWorthTrend"], queryFn: api.getNetWorthTrend });
+}
+
+export function useGoals() {
+  return useQuery({ queryKey: ["goals"], queryFn: api.listGoals });
+}
+
+export function useCreateGoal() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.createGoal, onSuccess: () => qc.invalidateQueries({ queryKey: ["goals"] }) });
+}
+
+export function useUpdateGoal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<api.Goal> }) => api.updateGoal(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["goals"] }),
+  });
+}
+
+export function useDeleteGoal() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.deleteGoal, onSuccess: () => qc.invalidateQueries({ queryKey: ["goals"] }) });
+}
+
+export function useBudgets() {
+  return useQuery({ queryKey: ["budgets"], queryFn: api.listBudgets });
+}
+
+export function useCreateBudget() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.createBudget, onSuccess: () => qc.invalidateQueries({ queryKey: ["budgets"] }) });
+}
+
+export function useUpdateBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<api.Budget> }) => api.updateBudget(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["budgets"] }),
+  });
+}
+
+export function useDeleteBudget() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.deleteBudget, onSuccess: () => qc.invalidateQueries({ queryKey: ["budgets"] }) });
+}
+
+export function useBills() {
+  return useQuery({ queryKey: ["bills"], queryFn: api.listBills });
+}
+
+export function useBillSuggestions() {
+  return useQuery({ queryKey: ["billSuggestions"], queryFn: api.getBillSuggestions });
+}
+
+export function useCreateBill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createBill,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["bills"] });
+      qc.invalidateQueries({ queryKey: ["billSuggestions"] });
+    },
+  });
+}
+
+export function useUpdateBill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<api.Bill> }) => api.updateBill(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["bills"] }),
+  });
+}
+
+export function useDeleteBill() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.deleteBill, onSuccess: () => qc.invalidateQueries({ queryKey: ["bills"] }) });
+}
+
+export function useMerchantSuggestion(query: string) {
+  return useQuery({
+    queryKey: ["merchantSuggest", query],
+    queryFn: () => api.suggestMerchant(query),
+    enabled: query.trim().length >= 3,
+  });
+}
+
+export function useMerchantIntelligence() {
+  return useQuery({ queryKey: ["merchantIntelligence"], queryFn: api.getMerchantIntelligence });
+}
+
+export function useAttachments(transactionId: string) {
+  return useQuery({ queryKey: ["attachments", transactionId], queryFn: () => api.listAttachments(transactionId) });
+}
+
+export function useUploadAttachment(transactionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { filename: string; mimeType: string; data: string }) => api.uploadAttachment(transactionId, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["attachments", transactionId] }),
+  });
+}
+
+export function useDeleteAttachment(transactionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.deleteAttachment,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["attachments", transactionId] }),
+  });
+}
