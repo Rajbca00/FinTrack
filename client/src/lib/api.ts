@@ -376,6 +376,30 @@ export const createGoal = (data: Partial<Goal>) => api.post<Goal>("/goals", data
 export const updateGoal = (id: string, data: Partial<Goal>) => api.put<Goal>(`/goals/${id}`, data).then((r) => r.data);
 export const deleteGoal = (id: string) => api.delete(`/goals/${id}`);
 
+// --- Budgets ---
+export type BudgetPeriod = "MONTHLY" | "QUARTERLY" | "YEARLY";
+
+export type Budget = {
+  id: string;
+  categoryId: string;
+  category?: Category;
+  amount: number;
+  period: BudgetPeriod;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  spent: number;
+  periodStart: string;
+  periodEnd: string;
+};
+
+export const listBudgets = () => api.get<Budget[]>("/budgets").then((r) => r.data);
+export const createBudget = (data: { categoryId: string; amount: number; period: BudgetPeriod }) =>
+  api.post<Budget>("/budgets", data).then((r) => r.data);
+export const updateBudget = (id: string, data: Partial<{ categoryId: string; amount: number; period: BudgetPeriod }>) =>
+  api.put<Budget>(`/budgets/${id}`, data).then((r) => r.data);
+export const deleteBudget = (id: string) => api.delete(`/budgets/${id}`);
+
 export type CategoryTrendMonth = { key: string; label: string };
 export type CategoryTrendRow = { categoryId: string; name: string; color: string | null; totals: number[]; total: number };
 export const getCategoryTrend = (params: {

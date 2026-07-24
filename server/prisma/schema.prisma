@@ -75,6 +75,7 @@ model Category {
   children     Category[]     @relation("CategoryHierarchy")
   rules        CategoryRule[]
   transactions Transaction[]
+  budgets      Budget[]
 }
 
 model CategoryRule {
@@ -174,6 +175,22 @@ model Liability {
   archived           Boolean   @default(false)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+}
+
+// A recurring spending limit for one category - amount is the limit for
+// whatever period is chosen; "spent" for the current period is computed on
+// read from Transactions rather than stored, so editing the amount just
+// changes the limit going forward without needing per-month rows (mirrors
+// how Asset.currentValue is a single live figure, not a ledger).
+model Budget {
+  id         String   @id @default(cuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  amount     Float
+  period     String   @default("MONTHLY")
+  archived   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 // A savings target the user is tracking towards (emergency fund, vacation,

@@ -14,8 +14,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useAccounts, useBalances, useBreakdown, useCategoryTrend, useGoals, useNetWorth, useNetWorthTrend, useTrend } from "../hooks/useApi";
-import { Card, Select, Label, ProgressBar } from "../components/ui";
+import {
+  useAccounts,
+  useBalances,
+  useBreakdown,
+  useBudgets,
+  useCategoryTrend,
+  useGoals,
+  useNetWorth,
+  useNetWorthTrend,
+  useTrend,
+} from "../hooks/useApi";
+import { Card, Select, Label, ProgressBar, Badge } from "../components/ui";
 import { formatMoney, formatDate } from "../lib/format";
 import { CHROME, DIVERGING, categoricalColor } from "../lib/palette";
 
@@ -30,6 +40,8 @@ export function Dashboard() {
   const { data: netWorth } = useNetWorth();
   const { data: netWorthTrend } = useNetWorthTrend();
   const { data: goals } = useGoals();
+  const { data: budgets } = useBudgets();
+  const budgetAlerts = useMemo(() => (budgets ?? []).filter((b) => b.amount > 0 && b.spent / b.amount >= 0.8), [budgets]);
   const [period, setPeriod] = useState<Period>("month");
   const [accountId, setAccountId] = useState("");
   // Filters the report sections (trend/breakdown/category-trend) below by
@@ -310,6 +322,36 @@ export function Dashboard() {
                     <p className="text-xs text-ink-muted">of {formatMoney(goal.targetAmount)}</p>
                   </div>
                   <ProgressBar value={pct} color={pct >= 100 ? "var(--color-good)" : undefined} />
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {budgetAlerts.length > 0 && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink-secondary">Budget alerts</h2>
+            <Link to="/budgets" className="text-sm font-medium text-brand hover:underline">
+              View all →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {budgetAlerts.map((budget) => {
+              const pct = (budget.spent / budget.amount) * 100;
+              const over = budget.spent > budget.amount;
+              return (
+                <Card key={budget.id} className="flex flex-col gap-2">
+                  <Badge color={budget.category?.color}>{budget.category?.name}</Badge>
+                  <div className="flex items-baseline justify-between">
+                    <p className={`text-sm font-semibold ${over ? "text-critical" : "text-ink"}`}>{formatMoney(budget.spent)}</p>
+                    <p className="text-xs text-ink-muted">of {formatMoney(budget.amount)}</p>
+                  </div>
+                  <ProgressBar value={pct} color={over ? "var(--color-critical)" : "#e0a020"} />
+                  <p className={`text-xs ${over ? "text-critical" : "text-ink-muted"}`}>
+                    {over ? "Over budget" : "Nearing budget limit"}
+                  </p>
                 </Card>
               );
             })}

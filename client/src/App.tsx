@@ -8,6 +8,7 @@ import { Categories } from "./pages/Categories";
 import { Transfers } from "./pages/Transfers";
 import { NetWorth } from "./pages/NetWorth";
 import { Goals } from "./pages/Goals";
+import { Budgets } from "./pages/Budgets";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="/transfers" element={<Transfers />} />
         <Route path="/net-worth" element={<NetWorth />} />
         <Route path="/goals" element={<Goals />} />
+        <Route path="/budgets" element={<Budgets />} />
         <Route path="/categories" element={<Categories />} />
       </Route>
     </Routes>

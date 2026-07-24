@@ -363,3 +363,25 @@ export function useDeleteGoal() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: api.deleteGoal, onSuccess: () => qc.invalidateQueries({ queryKey: ["goals"] }) });
 }
+
+export function useBudgets() {
+  return useQuery({ queryKey: ["budgets"], queryFn: api.listBudgets });
+}
+
+export function useCreateBudget() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.createBudget, onSuccess: () => qc.invalidateQueries({ queryKey: ["budgets"] }) });
+}
+
+export function useUpdateBudget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<api.Budget> }) => api.updateBudget(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["budgets"] }),
+  });
+}
+
+export function useDeleteBudget() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.deleteBudget, onSuccess: () => qc.invalidateQueries({ queryKey: ["budgets"] }) });
+}

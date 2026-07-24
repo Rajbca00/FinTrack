@@ -2,23 +2,24 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import clsx from "clsx";
 
+// `primary: true` marks the handful of items that also get a slot in the
+// mobile bottom tab bar (which only has room for a few before it feels
+// cramped) - everything else still shows in the tab bar's "More" sheet and
+// in the desktop sidebar (which scales vertically, so it lists everything
+// flat regardless of this flag).
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", tabLabel: "Home", end: true, icon: IconHome },
-  { to: "/net-worth", label: "Net Worth", tabLabel: "Net Worth", icon: IconTrendUp },
-  { to: "/goals", label: "Goals", tabLabel: "Goals", icon: IconFlag },
-  { to: "/accounts", label: "Accounts", tabLabel: "Accounts", icon: IconBank },
-  { to: "/transactions", label: "Transactions", tabLabel: "Activity", icon: IconList },
-  { to: "/transfers", label: "Transfers", tabLabel: "Transfers", icon: IconSwap },
-  { to: "/categories", label: "Categories & Rules", tabLabel: "Categories", icon: IconTag },
+  { to: "/", label: "Dashboard", tabLabel: "Home", end: true, icon: IconHome, primary: true },
+  { to: "/net-worth", label: "Net Worth", tabLabel: "Net Worth", icon: IconTrendUp, primary: true },
+  { to: "/goals", label: "Goals", tabLabel: "Goals", icon: IconFlag, primary: false },
+  { to: "/budgets", label: "Budgets", tabLabel: "Budgets", icon: IconPie, primary: false },
+  { to: "/accounts", label: "Accounts", tabLabel: "Accounts", icon: IconBank, primary: true },
+  { to: "/transactions", label: "Transactions", tabLabel: "Activity", icon: IconList, primary: true },
+  { to: "/transfers", label: "Transfers", tabLabel: "Transfers", icon: IconSwap, primary: false },
+  { to: "/categories", label: "Categories & Rules", tabLabel: "Categories", icon: IconTag, primary: false },
 ];
 
-// The bottom tab bar only has room for a handful of icons before it feels
-// cramped, and this list keeps growing as more sections ship - so mobile
-// gets the most-used items plus a "More" sheet for the rest, while desktop's
-// sidebar (which scales vertically) still shows everything flat.
-const MOBILE_PRIMARY_COUNT = 4;
-const mobilePrimaryItems = NAV_ITEMS.slice(0, MOBILE_PRIMARY_COUNT);
-const mobileOverflowItems = NAV_ITEMS.slice(MOBILE_PRIMARY_COUNT);
+const mobilePrimaryItems = NAV_ITEMS.filter((i) => i.primary);
+const mobileOverflowItems = NAV_ITEMS.filter((i) => !i.primary);
 
 const STORAGE_KEY = "fintrack.sidebarCollapsed";
 
@@ -203,6 +204,14 @@ function IconMore({ className }: IconProps) {
       <circle cx="5" cy="12" r="1.75" />
       <circle cx="12" cy="12" r="1.75" />
       <circle cx="19" cy="12" r="1.75" />
+    </svg>
+  );
+}
+
+function IconPie({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v9l7.5 4.3A9 9 0 1 1 12 3Z" />
     </svg>
   );
 }
