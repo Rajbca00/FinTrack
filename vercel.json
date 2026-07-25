@@ -1,7 +1,13 @@
 {
   "installCommand": "npm install && npm install --prefix client && npm install --prefix server && npm run migrate:deploy --prefix server",
   "builds": [
-    { "src": "api/index.ts", "use": "@vercel/node" },
+    {
+      "src": "api/index.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["server/node_modules/pdf-parse/**", "server/node_modules/node-ensure/**"]
+      }
+    },
     { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "client/dist" } }
   ],
   "routes": [
