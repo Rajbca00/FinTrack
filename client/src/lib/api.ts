@@ -513,6 +513,7 @@ export const deleteAttachment = (id: string) => api.delete(`/attachments/${id}`)
 // --- Settings / backup ---
 export const exportData = () => api.get<Record<string, unknown>>("/settings/export").then((r) => r.data);
 export const importData = (payload: Record<string, unknown>) => api.post("/settings/import", payload);
+export const resetApp = () => api.post("/settings/reset", { confirm: "RESET" });
 
 export type CategoryTrendMonth = { key: string; label: string };
 export type CategoryTrendRow = { categoryId: string; name: string; color: string | null; totals: number[]; total: number };
