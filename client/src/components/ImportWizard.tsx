@@ -5,6 +5,8 @@ import {
   confirmImport,
   previewIndmoneyImport,
   confirmIndmoneyImport,
+  previewIndmoneyPdfImport,
+  confirmIndmoneyPdfImport,
   getErrorMessage,
   type ColumnMapping,
   type DateFormat,
@@ -15,7 +17,21 @@ import type { Group, ImportResult } from "../lib/api";
 import { formatDate, formatMoney } from "../lib/format";
 import { useQueryClient } from "@tanstack/react-query";
 
-type Source = "csv" | "indmoney";
+type Source = "csv" | "indmoney" | "indmoney-pdf";
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // dataURL looks like "data:<mime>;base64,<data>" - only the part after
+      // the comma is the actual base64 payload the server expects.
+      const result = reader.result as string;
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 type Mode = "select" | "map" | "indmoney-review" | "done";
 
 // Client-side mirror of the server's ambiguous-date interpretation, purely
@@ -54,9 +70,11 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const [source, setSource] = useState<Source>("csv");
   const [indmoneyJsonText, setIndmoneyJsonText] = useState("");
   const [indmoneyPreview, setIndmoneyPreview] = useState<IndmoneyPreview | null>(null);
+  const [indmoneyPdfFile, setIndmoneyPdfFile] = useState<{ filename: string; data: string } | null>(null);
 
   const applyMapping = (mapping: {
     dateColumn: string | null;
@@ -148,11 +166,33 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
     }
   };
 
+  const handleIndmoneyPdfFile = async (file: File) => {
+    setError("");
+    setLoading(true);
+    try {
+      const data = await readFileAsBase64(file);
+      const p = await previewIndmoneyPdfImport(accountId, { filename: file.name, data });
+      setIndmoneyPdfFile({ filename: file.name, data });
+      setIndmoneyPreview(p);
+      if (!p.groups.some((g) => g.id === groupId)) {
+        setGroupId(p.groups.find((g) => g.isDefault)?.id ?? p.groups[0]?.id ?? "");
+      }
+      setMode("indmoney-review");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const submitIndmoney = async () => {
     setError("");
     setLoading(true);
     try {
-      const res = await confirmIndmoneyImport(accountId, { jsonText: indmoneyJsonText, groupId, applyRules });
+      const res =
+        source === "indmoney-pdf" && indmoneyPdfFile
+          ? await confirmIndmoneyPdfImport(accountId, { ...indmoneyPdfFile, groupId, applyRules })
+          : await confirmIndmoneyImport(accountId, { jsonText: indmoneyJsonText, groupId, applyRules });
       setResult(res);
       setMode("done");
       qc.invalidateQueries({ queryKey: ["transactions"] });
@@ -192,9 +232,37 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
             >
               IndMoney JSON
             </button>
+            <button
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                source === "indmoney-pdf" ? "bg-brand text-white" : "text-ink-secondary hover:text-ink"
+              }`}
+              onClick={() => {
+                setSource("indmoney-pdf");
+                setError("");
+              }}
+            >
+              IndMoney PDF
+            </button>
           </div>
 
-          {source === "csv" ? (
+          {source === "indmoney-pdf" ? (
+            <div className="flex flex-col items-center gap-4 py-4 text-center">
+              <p className="text-sm text-ink-secondary">
+                Upload the "Account Statement" PDF you can download per-account from IndMoney. Includes the bank's full
+                transaction narration, unlike the app screen's JSON.
+              </p>
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleIndmoneyPdfFile(e.target.files[0])}
+              />
+              <Button onClick={() => pdfInputRef.current?.click()} disabled={loading}>
+                {loading ? "Reading PDF…" : "Choose PDF statement"}
+              </Button>
+            </div>
+          ) : source === "csv" ? (
             <div className="flex flex-col items-center gap-4 py-4 text-center">
               <p className="text-sm text-ink-secondary">
                 Upload a CSV export of your bank or credit card statement. Works with common formats

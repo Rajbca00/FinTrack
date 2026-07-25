@@ -277,6 +277,18 @@ export const previewIndmoneyImport = (accountId: string, jsonText: string) =>
 export const confirmIndmoneyImport = (accountId: string, payload: { jsonText: string; groupId: string; applyRules: boolean }) =>
   api.post<ImportResult>(`/import/${accountId}/indmoney/confirm`, payload).then((r) => r.data);
 
+// --- IndMoney PDF statement import ---
+// A third import source: IndMoney's "Account Statement" PDF export (richer
+// than the JSON source - it carries the bank's actual narration text, which
+// the app-screen JSON doesn't expose). Uploaded as base64, same pattern as
+// attachments - see server/src/services/indmoneyPdfImport.ts.
+export const previewIndmoneyPdfImport = (accountId: string, payload: { filename: string; data: string }) =>
+  api.post<IndmoneyPreview>(`/import/${accountId}/indmoney-pdf/preview`, payload).then((r) => r.data);
+export const confirmIndmoneyPdfImport = (
+  accountId: string,
+  payload: { filename: string; data: string; groupId: string; applyRules: boolean }
+) => api.post<ImportResult>(`/import/${accountId}/indmoney-pdf/confirm`, payload).then((r) => r.data);
+
 // --- Transfers ---
 export const listTransfers = () => api.get<Transfer[]>("/transfers").then((r) => r.data);
 export const createTransfer = (data: Record<string, unknown>) => api.post<Transfer>("/transfers", data).then((r) => r.data);
