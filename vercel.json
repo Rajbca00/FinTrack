@@ -5,7 +5,12 @@
       "src": "api/index.ts",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["server/node_modules/pdf-parse/**", "server/node_modules/node-ensure/**"]
+        "includeFiles": [
+          "server/node_modules/pdf-parse/**",
+          "server/node_modules/node-ensure/**",
+          "server/node_modules/.prisma/**",
+          "server/node_modules/@prisma/client/**"
+        ]
       }
     },
     { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "client/dist" } }
