@@ -227,7 +227,12 @@ async function parsePdfUpload(data: string) {
   let parseIndmoneyPdf: (buf: Buffer) => Promise<import("../services/csvImport").NormalizeResult>;
   try {
     ({ parseIndmoneyPdf } = await import("../services/indmoneyPdfImport"));
-  } catch {
+  } catch (e) {
+    // The friendly message below is all the client sees - without logging
+    // the real error here, a load failure in production is undiagnosable
+    // from the outside (this bit us once already: no log line meant no way
+    // to tell a missing-module error apart from any other failure mode).
+    console.error("Failed to load indmoneyPdfImport module:", e);
     throw new Error("PDF statement import is temporarily unavailable - try CSV or IndMoney JSON instead.");
   }
   return parseIndmoneyPdf(Buffer.from(data, "base64"));
