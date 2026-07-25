@@ -21,8 +21,15 @@ export function Settings() {
       const dateStr = new Date().toISOString().slice(0, 10);
       a.href = url;
       a.download = `fintrack-backup-${dateStr}.json`;
+      // Safari (desktop and iOS) only reliably fires the download if the
+      // anchor is actually in the DOM when clicked, and revoking the blob
+      // URL in the same tick as click() can race ahead of the browser
+      // starting the download - both silently no-op the export instead of
+      // erroring, so the delay and appendChild are load-bearing, not cleanup.
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       setMessage("Export downloaded.");
     } catch (e) {
       setError(getErrorMessage(e));
