@@ -1,7 +1,9 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Card, Button } from "../components/ui";
-import { exportData, importData, getErrorMessage } from "../lib/api";
+import { Card, Button, Modal, Input } from "../components/ui";
+import { exportData, importData, resetApp, getErrorMessage } from "../lib/api";
+
+const RESET_PHRASE = "RESET";
 
 export function Settings() {
   const [exporting, setExporting] = useState(false);
@@ -9,6 +11,9 @@ export function Settings() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   const handleExport = async () => {
     setExporting(true);
@@ -59,6 +64,21 @@ export function Settings() {
       setError(getErrorMessage(e));
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleReset = async () => {
+    setResetting(true);
+    setError("");
+    try {
+      await resetApp();
+      setShowResetModal(false);
+      setMessage("App reset. Reloading…");
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -146,6 +166,60 @@ export function Settings() {
           <p className="text-xs text-ink-muted">Personal finance manager - accounts, budgets, goals, and net worth in one place.</p>
         </Card>
       </div>
+
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-critical">Danger Zone</h2>
+        <Card className="flex flex-col gap-2 border-critical/30 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-ink">Reset app</p>
+            <p className="text-xs text-critical">
+              Permanently deletes every account, transaction, and everything else, then restores the default
+              categories. There's no undo - export a backup first if you want one.
+            </p>
+          </div>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setResetConfirmText("");
+              setError("");
+              setShowResetModal(true);
+            }}
+          >
+            Reset app…
+          </Button>
+        </Card>
+      </div>
+
+      {showResetModal && (
+        <Modal title="Reset app?" onClose={() => setShowResetModal(false)}>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-ink-secondary">
+              This permanently deletes every account, transaction, asset, goal, budget, and everything else in
+              FinTrack, then restores the default categories and rules. <strong className="text-critical">This can't be undone.</strong>
+            </p>
+            <div>
+              <p className="mb-1 text-xs font-medium text-ink-muted">
+                Type <span className="font-mono text-ink">{RESET_PHRASE}</span> to confirm
+              </p>
+              <Input
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value)}
+                placeholder={RESET_PHRASE}
+                autoFocus
+              />
+            </div>
+            {error && <p className="text-sm text-critical">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setShowResetModal(false)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleReset} disabled={resetting || resetConfirmText !== RESET_PHRASE}>
+                {resetting ? "Resetting…" : "Reset everything"}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

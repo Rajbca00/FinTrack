@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { seedDefaults } from "./defaultSeed";
 
 // A full snapshot of every table, in the shape needed to recreate the
 // database exactly - ids are preserved (not regenerated) so relations
@@ -99,4 +100,30 @@ export async function importAllData(payload: BackupPayload) {
     if (data.attachments.length) await tx.attachment.createMany({ data: data.attachments });
     if (data.netWorthSnapshots.length) await tx.netWorthSnapshot.createMany({ data: data.netWorthSnapshots });
   });
+}
+
+// Wipes every table - same deletion order as importAllData - then reseeds
+// the default categories/rules, landing the app back on exactly the state
+// it's in right after a fresh install. Unlike import, there's no backup to
+// restore from afterward, so this is the more destructive of the two and
+// the route calling this needs its own explicit confirmation on the client.
+export async function resetAllData() {
+  await prisma.$transaction(async (tx) => {
+    await tx.attachment.deleteMany();
+    await tx.transaction.deleteMany();
+    await tx.transfer.deleteMany();
+    await tx.importBatch.deleteMany();
+    await tx.budget.deleteMany();
+    await tx.bill.deleteMany();
+    await tx.goal.deleteMany();
+    await tx.group.deleteMany();
+    await tx.account.deleteMany();
+    await tx.categoryRule.deleteMany();
+    await tx.category.deleteMany();
+    await tx.asset.deleteMany();
+    await tx.liability.deleteMany();
+    await tx.netWorthSnapshot.deleteMany();
+  });
+
+  await seedDefaults(prisma);
 }
