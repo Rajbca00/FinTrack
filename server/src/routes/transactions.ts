@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { categorize } from "../services/rulesEngine";
+import { findSimilarTransactions } from "../services/merchants";
 
 export const transactionsRouter = Router();
 
@@ -78,6 +79,21 @@ transactionsRouter.get("/", async (req, res) => {
   }
 
   res.json({ total, page, pageSize, transactions, runningBalances });
+});
+
+transactionsRouter.get("/:id/similar", async (req, res) => {
+  const targetCategoryId = typeof req.query.categoryId === "string" ? req.query.categoryId : "";
+  if (!targetCategoryId) return res.status(400).json({ error: "categoryId query param is required" });
+
+  const transaction = await prisma.transaction.findUnique({ where: { id: req.params.id } });
+  if (!transaction) return res.status(404).json({ error: "Transaction not found" });
+
+  const similar = await findSimilarTransactions({
+    transactionId: transaction.id,
+    description: transaction.description,
+    targetCategoryId,
+  });
+  res.json({ count: similar.length, transactions: similar });
 });
 
 const createSchema = z.object({

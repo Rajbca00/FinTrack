@@ -2,8 +2,9 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { parseCsv, suggestMapping, normalizeRows, detectDateFormat, ColumnMapping } from "../services/csvImport";
-import { dedupeKey } from "../lib/dedupe";
-import { categorize } from "../services/rulesEngine";
+import { parseIndmoneyPayload } from "../services/indmoneyImport";
+import { parseIndmoneyPdf } from "../services/indmoneyPdfImport";
+import { commitImportRows } from "../services/importCommit";
 
 export const importsRouter = Router();
 
@@ -111,63 +112,188 @@ importsRouter.post("/:accountId/confirm", async (req, res) => {
     });
   }
 
-  const existingKeys = new Set(
-    (
-      await prisma.transaction.findMany({
-        where: { accountId, dedupeKey: { not: null } },
-        select: { dedupeKey: true },
-      })
-    ).map((t) => t.dedupeKey as string)
-  );
-
-  const batch = await prisma.importBatch.create({
-    data: { accountId, filename, rowCount: rows.length },
+  const result = await commitImportRows({
+    accountId,
+    groupId,
+    filename,
+    totalCount: rows.length,
+    rows: normalized,
+    invalid,
+    applyRules,
   });
 
-  let created = 0;
-  let skipped = 0;
-  const seenThisBatch = new Set<string>();
-
-  for (const row of normalized) {
-    const key = dedupeKey(row.dateISO, row.description, row.amount);
-    if (existingKeys.has(key) || seenThisBatch.has(key)) {
-      skipped++;
-      continue;
-    }
-    seenThisBatch.add(key);
-
-    const categoryId = applyRules ? await categorize({ description: row.description, amount: row.amount }) : null;
-
-    await prisma.transaction.create({
-      data: {
-        accountId,
-        groupId,
-        date: new Date(row.dateISO),
-        description: row.description,
-        rawDescription: row.description,
-        amount: row.amount,
-        categoryId,
-        dedupeKey: key,
-        importBatchId: batch.id,
-      },
-    });
-    created++;
-  }
-
-  await prisma.importBatch.update({ where: { id: batch.id }, data: { skippedDuplicates: skipped } });
   await prisma.account.update({
     where: { id: accountId },
     data: { lastImportMapping: JSON.stringify(mapping), lastImportGroupId: groupId },
   });
 
-  res.status(201).json({
-    batchId: batch.id,
-    created,
-    skipped,
-    total: rows.length,
-    invalidRowCount: invalid.length,
-    invalidSamples: invalid.slice(0, 5),
+  res.status(201).json(result);
+});
+
+const indmoneyPreviewSchema = z.object({
+  jsonText: z.string().min(1),
+});
+
+importsRouter.post("/:accountId/indmoney/preview", async (req, res) => {
+  const parsed = indmoneyPreviewSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const account = await prisma.account.findUnique({
+    where: { id: req.params.accountId },
+    include: { groups: { where: { archived: false } } },
   });
+  if (!account) return res.status(404).json({ error: "Account not found" });
+
+  let result;
+  try {
+    result = parseIndmoneyPayload(parsed.data.jsonText);
+  } catch (e) {
+    return res.status(400).json({ error: e instanceof Error ? e.message : "Could not read this JSON" });
+  }
+
+  res.json({
+    parsedCount: result.rows.length + result.invalid.length,
+    invalidCount: result.invalid.length,
+    sampleRows: result.rows.slice(0, 10),
+    groups: account.groups,
+  });
+});
+
+const indmoneyConfirmSchema = z.object({
+  jsonText: z.string().min(1),
+  groupId: z.string().min(1),
+  applyRules: z.boolean().default(true),
+});
+
+importsRouter.post("/:accountId/indmoney/confirm", async (req, res) => {
+  const parsed = indmoneyConfirmSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { jsonText, groupId, applyRules } = parsed.data;
+  const accountId = req.params.accountId;
+
+  const group = await prisma.group.findUnique({ where: { id: groupId } });
+  if (!group || group.accountId !== accountId) {
+    return res.status(400).json({ error: "Group does not belong to this account" });
+  }
+
+  let parsedPayload;
+  try {
+    parsedPayload = parseIndmoneyPayload(jsonText);
+  } catch (e) {
+    return res.status(400).json({ error: e instanceof Error ? e.message : "Could not read this JSON" });
+  }
+  const { rows: normalized, invalid } = parsedPayload;
+  const totalCount = normalized.length + invalid.length;
+
+  if (normalized.length === 0) {
+    return res.status(400).json({
+      error: `None of the ${totalCount} transaction(s) in this file could be read.`,
+      invalidRowCount: invalid.length,
+      invalidSamples: invalid.slice(0, 5),
+    });
+  }
+
+  const result = await commitImportRows({
+    accountId,
+    groupId,
+    filename: "indmoney-transactions.json",
+    totalCount,
+    rows: normalized,
+    invalid,
+    applyRules,
+  });
+
+  res.status(201).json(result);
+});
+
+// Base64 inflates the raw file size by ~4/3 - 7MB raw keeps the encoded
+// payload comfortably under app.ts's express.json 10mb limit.
+const MAX_PDF_BYTES = 7 * 1024 * 1024;
+
+const indmoneyPdfPreviewSchema = z.object({
+  filename: z.string().default("statement.pdf"),
+  data: z.string().min(1), // base64, no data: URL prefix
+});
+
+async function parsePdfUpload(data: string) {
+  const size = Buffer.byteLength(data, "base64");
+  if (size > MAX_PDF_BYTES) {
+    throw new Error(`PDF too large (max ${MAX_PDF_BYTES / (1024 * 1024)}MB)`);
+  }
+  return parseIndmoneyPdf(Buffer.from(data, "base64"));
+}
+
+importsRouter.post("/:accountId/indmoney-pdf/preview", async (req, res) => {
+  const parsed = indmoneyPdfPreviewSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const account = await prisma.account.findUnique({
+    where: { id: req.params.accountId },
+    include: { groups: { where: { archived: false } } },
+  });
+  if (!account) return res.status(404).json({ error: "Account not found" });
+
+  let result;
+  try {
+    result = await parsePdfUpload(parsed.data.data);
+  } catch (e) {
+    return res.status(400).json({ error: e instanceof Error ? e.message : "Could not read this PDF" });
+  }
+
+  res.json({
+    parsedCount: result.rows.length + result.invalid.length,
+    invalidCount: result.invalid.length,
+    sampleRows: result.rows.slice(0, 10),
+    groups: account.groups,
+  });
+});
+
+const indmoneyPdfConfirmSchema = z.object({
+  filename: z.string().default("statement.pdf"),
+  data: z.string().min(1),
+  groupId: z.string().min(1),
+  applyRules: z.boolean().default(true),
+});
+
+importsRouter.post("/:accountId/indmoney-pdf/confirm", async (req, res) => {
+  const parsed = indmoneyPdfConfirmSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { filename, data, groupId, applyRules } = parsed.data;
+  const accountId = req.params.accountId;
+
+  const group = await prisma.group.findUnique({ where: { id: groupId } });
+  if (!group || group.accountId !== accountId) {
+    return res.status(400).json({ error: "Group does not belong to this account" });
+  }
+
+  let parsedPdf;
+  try {
+    parsedPdf = await parsePdfUpload(data);
+  } catch (e) {
+    return res.status(400).json({ error: e instanceof Error ? e.message : "Could not read this PDF" });
+  }
+  const { rows: normalized, invalid } = parsedPdf;
+  const totalCount = normalized.length + invalid.length;
+
+  if (normalized.length === 0) {
+    return res.status(400).json({
+      error: `None of the ${totalCount} transaction(s) in this statement could be read.`,
+      invalidRowCount: invalid.length,
+      invalidSamples: invalid.slice(0, 5),
+    });
+  }
+
+  const result = await commitImportRows({
+    accountId,
+    groupId,
+    filename,
+    totalCount,
+    rows: normalized,
+    invalid,
+    applyRules,
+  });
+
+  res.status(201).json(result);
 });
 
 importsRouter.get("/:accountId/batches", async (req, res) => {

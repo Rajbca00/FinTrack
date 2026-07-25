@@ -1,5 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // "native" covers local dev; "rhel-openssl-3.0.x" is Vercel's actual
+  // Node serverless runtime (Amazon Linux 2023) - without it the generated
+  // client only ships an engine binary for the build/dev machine's OS, which
+  // can silently produce a broken client at runtime on Vercel even though
+  // `prisma generate` succeeds.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

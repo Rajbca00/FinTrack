@@ -241,25 +241,53 @@ export type ColumnMapping = {
 };
 export type InvalidImportRow = {
   rowIndex: number;
-  reason: "invalid_date" | "missing_description";
+  reason: "invalid_date" | "missing_description" | "invalid_amount";
   dateRaw: string;
   descriptionRaw: string;
+};
+
+export type ImportResult = {
+  batchId: string;
+  created: number;
+  skipped: number;
+  total: number;
+  invalidRowCount: number;
+  invalidSamples: InvalidImportRow[];
 };
 
 export const confirmImport = (
   accountId: string,
   payload: { fileContent: string; filename: string; mapping: ColumnMapping; groupId: string; applyRules: boolean }
-) =>
-  api
-    .post<{
-      batchId: string;
-      created: number;
-      skipped: number;
-      total: number;
-      invalidRowCount: number;
-      invalidSamples: InvalidImportRow[];
-    }>(`/import/${accountId}/confirm`, payload)
-    .then((r) => r.data);
+) => api.post<ImportResult>(`/import/${accountId}/confirm`, payload).then((r) => r.data);
+
+// --- IndMoney JSON import ---
+// A parallel import source to CSV: paste the JSON payload from IndMoney's
+// Account Aggregator "All Transactions" screen instead of exporting/uploading
+// a bank statement file. No column mapping needed - the shape is fixed and
+// parsed entirely server-side (see server/src/services/indmoneyImport.ts).
+export type IndmoneySampleRow = { dateISO: string; description: string; amount: number };
+export type IndmoneyPreview = {
+  parsedCount: number;
+  invalidCount: number;
+  sampleRows: IndmoneySampleRow[];
+  groups: Group[];
+};
+export const previewIndmoneyImport = (accountId: string, jsonText: string) =>
+  api.post<IndmoneyPreview>(`/import/${accountId}/indmoney/preview`, { jsonText }).then((r) => r.data);
+export const confirmIndmoneyImport = (accountId: string, payload: { jsonText: string; groupId: string; applyRules: boolean }) =>
+  api.post<ImportResult>(`/import/${accountId}/indmoney/confirm`, payload).then((r) => r.data);
+
+// --- IndMoney PDF statement import ---
+// A third import source: IndMoney's "Account Statement" PDF export (richer
+// than the JSON source - it carries the bank's actual narration text, which
+// the app-screen JSON doesn't expose). Uploaded as base64, same pattern as
+// attachments - see server/src/services/indmoneyPdfImport.ts.
+export const previewIndmoneyPdfImport = (accountId: string, payload: { filename: string; data: string }) =>
+  api.post<IndmoneyPreview>(`/import/${accountId}/indmoney-pdf/preview`, payload).then((r) => r.data);
+export const confirmIndmoneyPdfImport = (
+  accountId: string,
+  payload: { filename: string; data: string; groupId: string; applyRules: boolean }
+) => api.post<ImportResult>(`/import/${accountId}/indmoney-pdf/confirm`, payload).then((r) => r.data);
 
 // --- Transfers ---
 export const listTransfers = () => api.get<Transfer[]>("/transfers").then((r) => r.data);
@@ -452,6 +480,18 @@ export type MerchantIntelligence = {
   topExpenses: MerchantStat[];
 };
 export const getMerchantIntelligence = () => api.get<MerchantIntelligence>("/merchants/top").then((r) => r.data);
+
+export type SimilarTransaction = {
+  id: string;
+  description: string;
+  date: string;
+  amount: number;
+  categoryId: string | null;
+};
+export const getSimilarTransactions = (transactionId: string, categoryId: string) =>
+  api
+    .get<{ count: number; transactions: SimilarTransaction[] }>(`/transactions/${transactionId}/similar`, { params: { categoryId } })
+    .then((r) => r.data);
 
 // --- Attachments ---
 export type Attachment = {

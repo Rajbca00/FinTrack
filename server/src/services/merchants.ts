@@ -48,6 +48,45 @@ export async function suggestForDescription(query: string): Promise<MerchantSugg
   };
 }
 
+export type SimilarTransaction = {
+  id: string;
+  description: string;
+  date: Date;
+  amount: number;
+  categoryId: string | null;
+};
+
+// Surfaces other transactions worth re-categorizing (or ruling) alongside
+// the one that was just manually categorized - same substring-match logic
+// as suggestForDescription, but returns the actual rows instead of an
+// aggregate, since the caller needs real ids to bulk-apply a category to.
+// Excludes rows already in the target category so the count reflects only
+// what would actually change.
+export async function findSimilarTransactions(opts: {
+  transactionId: string;
+  description: string;
+  targetCategoryId: string;
+  limit?: number;
+}): Promise<SimilarTransaction[]> {
+  const q = opts.description.trim();
+  if (q.length < 2) return [];
+
+  return prisma.transaction.findMany({
+    where: {
+      id: { not: opts.transactionId },
+      description: { contains: q, mode: "insensitive" },
+      isTransfer: false,
+      // `categoryId: { not: X }` alone would silently exclude uncategorized
+      // rows too - SQL's `NULL <> X` is NULL, not true, so those never match
+      // a plain "not equal" filter. OR in the null case explicitly.
+      OR: [{ categoryId: null }, { categoryId: { not: opts.targetCategoryId } }],
+    },
+    select: { id: true, description: true, date: true, amount: true, categoryId: true },
+    orderBy: { date: "desc" },
+    take: opts.limit ?? 20,
+  });
+}
+
 export async function getMerchantIntelligence(limit = 8) {
   const txns = await prisma.transaction.findMany({
     where: { isTransfer: false, amount: { lt: 0 } },
