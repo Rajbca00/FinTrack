@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Category, Group, Transaction } from "../lib/api";
-import { assignableCategories, getErrorMessage } from "../lib/api";
+import type { Category, Group, SimilarTransaction, Transaction } from "../lib/api";
+import { assignableCategories, getErrorMessage, getSimilarTransactions } from "../lib/api";
 import {
   useAccounts,
   useDeleteTransaction,
   useUpdateTransaction,
   useCreateTransfer,
+  useCreateRule,
   useBulkCategorize,
   useBulkMoveGroup,
   useBulkDeleteTransactions,
@@ -79,6 +80,33 @@ export function TransactionTable({
     () => transactions.filter((t) => t.id !== pendingDelete?.id),
     [transactions, pendingDelete]
   );
+
+  // After a manual category pick (the quick inline Select, not the full Edit
+  // modal), check whether other transactions share this description and
+  // aren't already in that category - if so, offer to turn it into a rule
+  // (and optionally fix up the existing ones too) instead of leaving the
+  // user to notice and recategorize each one by hand later.
+  const [ruleSuggestion, setRuleSuggestion] = useState<{
+    transaction: Transaction;
+    categoryId: string;
+    category: Category;
+    similar: SimilarTransaction[];
+  } | null>(null);
+
+  async function handleCategoryChange(t: Transaction, categoryId: string) {
+    updateTransaction.mutate({ id: t.id, data: { categoryId: categoryId || null } });
+    if (!categoryId) return;
+    const category = categories.find((c) => c.id === categoryId);
+    if (!category) return;
+    try {
+      const res = await getSimilarTransactions(t.id, categoryId);
+      if (res.count > 0) {
+        setRuleSuggestion({ transaction: t, categoryId, category, similar: res.transactions });
+      }
+    } catch {
+      // best-effort suggestion - the category change itself already succeeded
+    }
+  }
 
   // Transfers can't be bulk-acted on (mirrors the single-row restrictions
   // below), so they're excluded from "select all" and can't be checked.
@@ -172,7 +200,7 @@ export function TransactionTable({
               <div className="mt-3 flex flex-wrap gap-1.5">
                 <Select
                   value={t.categoryId ?? ""}
-                  onChange={(e) => updateTransaction.mutate({ id: t.id, data: { categoryId: e.target.value || null } })}
+                  onChange={(e) => handleCategoryChange(t, e.target.value)}
                   className="w-auto rounded-full border-hairline-strong bg-white/5 py-1 pl-2.5 text-xs"
                 >
                   <option value="">Uncategorized</option>
@@ -285,7 +313,7 @@ export function TransactionTable({
               <td className="px-4 py-2">
                 <Select
                   value={t.categoryId ?? ""}
-                  onChange={(e) => updateTransaction.mutate({ id: t.id, data: { categoryId: e.target.value || null } })}
+                  onChange={(e) => handleCategoryChange(t, e.target.value)}
                   className="min-w-[10rem]"
                 >
                   <option value="">Uncategorized</option>
@@ -331,6 +359,16 @@ export function TransactionTable({
 
       {pendingDelete && (
         <Toast message={`Deleted "${pendingDelete.description}"`} actionLabel="Undo" onAction={undoDelete} />
+      )}
+
+      {ruleSuggestion && (
+        <RuleSuggestionModal
+          transaction={ruleSuggestion.transaction}
+          categoryId={ruleSuggestion.categoryId}
+          categoryName={ruleSuggestion.category.name}
+          similar={ruleSuggestion.similar}
+          onClose={() => setRuleSuggestion(null)}
+        />
       )}
 
       {editing && (
@@ -584,6 +622,69 @@ function EditTransactionModal({
         {(createTransfer.isError || deleteTransaction.isError) && (
           <p className="text-xs text-critical">{getErrorMessage(createTransfer.error ?? deleteTransaction.error)}</p>
         )}
+      </div>
+    </Modal>
+  );
+}
+
+function RuleSuggestionModal({
+  transaction,
+  categoryId,
+  categoryName,
+  similar,
+  onClose,
+}: {
+  transaction: Transaction;
+  categoryId: string;
+  categoryName: string;
+  similar: SimilarTransaction[];
+  onClose: () => void;
+}) {
+  const createRule = useCreateRule();
+  const bulkCategorize = useBulkCategorize();
+  const [pattern, setPattern] = useState(transaction.description);
+  const [alsoApply, setAlsoApply] = useState(true);
+
+  const submit = () => {
+    if (!pattern.trim()) return;
+    createRule.mutate({ pattern: pattern.trim(), matchType: "CONTAINS", amountSign: "ANY", categoryId, priority: 0 });
+    if (alsoApply && similar.length > 0) {
+      bulkCategorize.mutate({ transactionIds: similar.map((s) => s.id), categoryId });
+    }
+    onClose();
+  };
+
+  return (
+    <Modal title="Create a rule?" onClose={onClose}>
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-ink-secondary">
+          Found {similar.length} other transaction{similar.length === 1 ? "" : "s"} matching "{transaction.description}".
+          Auto-categorize these as <strong className="text-ink">{categoryName}</strong> going forward?
+        </p>
+        <div>
+          <Label>Rule pattern (matches descriptions containing this text)</Label>
+          <Input value={pattern} onChange={(e) => setPattern(e.target.value)} />
+        </div>
+        <label className="flex items-center gap-2 text-sm text-ink-secondary">
+          <input type="checkbox" checked={alsoApply} onChange={(e) => setAlsoApply(e.target.checked)} />
+          Also apply {categoryName} to these {similar.length} transaction{similar.length === 1 ? "" : "s"} now
+        </label>
+        <div className="max-h-32 overflow-y-auto rounded-lg border border-hairline text-xs">
+          {similar.slice(0, 8).map((s) => (
+            <div key={s.id} className="flex items-center justify-between border-b border-hairline px-2 py-1.5 last:border-0">
+              <span className="truncate text-ink-secondary">{s.description}</span>
+              <span className="shrink-0 pl-2 text-ink-muted">{formatMoney(s.amount)}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            Not now
+          </Button>
+          <Button onClick={submit} disabled={!pattern.trim()}>
+            Create rule
+          </Button>
+        </div>
       </div>
     </Modal>
   );

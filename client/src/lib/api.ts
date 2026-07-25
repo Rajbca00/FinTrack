@@ -469,6 +469,18 @@ export type MerchantIntelligence = {
 };
 export const getMerchantIntelligence = () => api.get<MerchantIntelligence>("/merchants/top").then((r) => r.data);
 
+export type SimilarTransaction = {
+  id: string;
+  description: string;
+  date: string;
+  amount: number;
+  categoryId: string | null;
+};
+export const getSimilarTransactions = (transactionId: string, categoryId: string) =>
+  api
+    .get<{ count: number; transactions: SimilarTransaction[] }>(`/transactions/${transactionId}/similar`, { params: { categoryId } })
+    .then((r) => r.data);
+
 // --- Attachments ---
 export type Attachment = {
   id: string;
