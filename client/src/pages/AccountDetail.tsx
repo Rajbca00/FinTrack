@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   useAccounts,
   useBalances,
   useCategories,
   useTransactions,
+  useTrend,
   useCreateGroup,
   useDeleteGroup,
   useUpdateAccount,
   useUpdateGroup,
 } from "../hooks/useApi";
-import { Card, Button, Modal, Input, Label, Badge, EmptyState, Loading } from "../components/ui";
+import { Card, Button, Modal, Input, Label, Badge, EmptyState, Loading, Select, StatCard } from "../components/ui";
 import { ImportWizard } from "../components/ImportWizard";
 import { TransactionTable } from "../components/TransactionTable";
 import { AddTransactionModal } from "../components/AddTransactionModal";
@@ -39,6 +40,15 @@ export function AccountDetail() {
   // rather than requiring the (nonexistent) filter chips to select it.
   const effectiveGroupId = activeGroupId ?? (account?.groups.length === 1 ? account.groups[0].id : undefined);
   const { data: txnData, isLoading } = useTransactions({ accountId: id, groupId: effectiveGroupId, pageSize: 100 });
+
+  const { data: trend } = useTrend({ period: "month", accountId: id, groupId: effectiveGroupId });
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string | undefined>(undefined);
+  // Defaults to the most recent month (the last point the trend endpoint
+  // returns) - only overridden once the user actually picks a different one.
+  const activeMonth = useMemo(() => {
+    if (!trend || trend.length === 0) return undefined;
+    return trend.find((t) => t.key === selectedMonthKey) ?? trend[trend.length - 1];
+  }, [trend, selectedMonthKey]);
 
   if (!account) return <Loading label="Loading account…" />;
 
@@ -114,6 +124,29 @@ export function AccountDetail() {
           {account.groups.map((g) => (
             <FilterChip key={g.id} label={g.name} active={activeGroupId === g.id} onClick={() => setActiveGroupId(g.id)} />
           ))}
+        </div>
+      )}
+
+      {trend && trend.length > 0 && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink-secondary">Monthly view</h2>
+            <Select
+              value={activeMonth?.key ?? ""}
+              onChange={(e) => setSelectedMonthKey(e.target.value)}
+              className="w-auto"
+            >
+              {trend.map((t) => (
+                <option key={t.key} value={t.key}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <StatCard label="Inflow" value={formatMoney(activeMonth?.income ?? 0, account.currency)} tone="good" />
+            <StatCard label="Outflow" value={formatMoney(activeMonth?.expense ?? 0, account.currency)} tone="bad" />
+          </div>
         </div>
       )}
 

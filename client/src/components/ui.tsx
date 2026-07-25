@@ -9,6 +9,16 @@ export function Card({ className, children }: { className?: string; children: Re
   );
 }
 
+export function StatCard({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
+  const toneClass = tone === "good" ? "text-good" : tone === "bad" ? "text-critical" : "text-ink";
+  return (
+    <Card>
+      <p className="text-xs font-medium uppercase text-ink-muted">{label}</p>
+      <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>
+    </Card>
+  );
+}
+
 export function Button({
   variant = "primary",
   className,

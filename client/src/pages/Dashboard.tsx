@@ -27,7 +27,7 @@ import {
   useNetWorthTrend,
   useTrend,
 } from "../hooks/useApi";
-import { Card, Select, Label, ProgressBar, Badge } from "../components/ui";
+import { Card, Select, Label, ProgressBar, Badge, StatCard } from "../components/ui";
 import { formatMoney, formatDate } from "../lib/format";
 import { CHROME, DIVERGING, categoricalColor } from "../lib/palette";
 import { usePersistentState } from "../hooks/usePersistentState";
@@ -610,16 +610,6 @@ function BillGroupColumn({ title, bills }: { title: string; bills: Bill[] }) {
         ))}
       </ul>
     </div>
-  );
-}
-
-function StatCard({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
-  const toneClass = tone === "good" ? "text-good" : tone === "bad" ? "text-critical" : "text-ink";
-  return (
-    <Card>
-      <p className="text-xs font-medium uppercase text-ink-muted">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>
-    </Card>
   );
 }
 
