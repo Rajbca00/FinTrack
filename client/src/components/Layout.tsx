@@ -49,20 +49,34 @@ export function Layout() {
         )}
       >
         <div className={clsx("mb-8 flex items-center", collapsed ? "justify-center px-0" : "justify-between px-2")}>
-          {!collapsed && (
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight text-ink">FinTrack</h1>
-              <p className="text-xs text-ink-muted">Personal finance manager</p>
-            </div>
+          {collapsed ? (
+            <button
+              onClick={() => setCollapsed(false)}
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+              className="rounded-lg"
+            >
+              <Logo className="h-8 w-8" />
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2.5">
+                <Logo className="h-8 w-8 shrink-0" />
+                <div>
+                  <h1 className="text-lg font-semibold tracking-tight text-ink">FinTrack</h1>
+                  <p className="text-xs text-ink-muted">Personal finance manager</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCollapsed(true)}
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+                className="rounded-lg p-1.5 text-ink-muted hover:bg-white/5 hover:text-ink"
+              >
+                <IconChevron collapsed={collapsed} />
+              </button>
+            </>
           )}
-          <button
-            onClick={() => setCollapsed((c) => !c)}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="rounded-lg p-1.5 text-ink-muted hover:bg-white/5 hover:text-ink"
-          >
-            <IconChevron collapsed={collapsed} />
-          </button>
         </div>
         <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map((item) => (
@@ -164,6 +178,25 @@ export function Layout() {
 }
 
 type IconProps = { className?: string };
+
+function Logo({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className={className} aria-hidden="true">
+      <defs>
+        <linearGradient id="fintrackLogoBg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#7e14ff" />
+          <stop offset="1" stopColor="#47bfff" />
+        </linearGradient>
+      </defs>
+      <rect width="48" height="48" rx="11" fill="url(#fintrackLogoBg)" />
+      <rect x="4" y="25" width="17" height="14" rx="3.5" fill="#fff" />
+      <circle cx="21" cy="32" r="2.2" fill="#7e14ff" />
+      <rect x="25" y="30" width="4.5" height="10" rx="1.4" fill="#fff" />
+      <rect x="32" y="22" width="4.5" height="18" rx="1.4" fill="#fff" />
+      <rect x="39" y="14" width="4.5" height="26" rx="1.4" fill="#fff" />
+    </svg>
+  );
+}
 
 function IconChevron({ collapsed, className }: IconProps & { collapsed: boolean }) {
   return (
