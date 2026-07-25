@@ -226,7 +226,7 @@ async function parsePdfUpload(data: string) {
   // app failing to boot (imports.ts is required from app.ts's startup path).
   let parseIndmoneyPdf: (buf: Buffer) => Promise<import("../services/csvImport").NormalizeResult>;
   try {
-    ({ parseIndmoneyPdf } = await import("../services/indmoneyPdfImport"));
+    ({ parseIndmoneyPdf } = await import("../services/indmoneyPdfImport.js"));
   } catch (e) {
     // The friendly message below is all the client sees - without logging
     // the real error here, a load failure in production is undiagnosable
