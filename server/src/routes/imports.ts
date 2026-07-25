@@ -3,7 +3,6 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { parseCsv, suggestMapping, normalizeRows, detectDateFormat, ColumnMapping } from "../services/csvImport";
 import { parseIndmoneyPayload } from "../services/indmoneyImport";
-import { parseIndmoneyPdf } from "../services/indmoneyPdfImport";
 import { commitImportRows } from "../services/importCommit";
 
 export const importsRouter = Router();
@@ -219,6 +218,17 @@ async function parsePdfUpload(data: string) {
   const size = Buffer.byteLength(data, "base64");
   if (size > MAX_PDF_BYTES) {
     throw new Error(`PDF too large (max ${MAX_PDF_BYTES / (1024 * 1024)}MB)`);
+  }
+  // Loaded lazily (not as a top-level import) so that if pdf-parse ever fails
+  // to load in a given deployment environment - it's happened before with a
+  // different dependency getting silently dropped from Vercel's serverless
+  // bundle - only these two PDF-import routes break instead of the whole
+  // app failing to boot (imports.ts is required from app.ts's startup path).
+  let parseIndmoneyPdf: (buf: Buffer) => Promise<import("../services/csvImport").NormalizeResult>;
+  try {
+    ({ parseIndmoneyPdf } = await import("../services/indmoneyPdfImport"));
+  } catch {
+    throw new Error("PDF statement import is temporarily unavailable - try CSV or IndMoney JSON instead.");
   }
   return parseIndmoneyPdf(Buffer.from(data, "base64"));
 }
