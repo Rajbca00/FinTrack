@@ -1,5 +1,4 @@
 {
-  "installCommand": "npm install && npm install --prefix client && npm install --prefix server && npm run prisma:generate --prefix server && npm run migrate:deploy --prefix server",
   "builds": [
     {
       "src": "api/index.ts",
