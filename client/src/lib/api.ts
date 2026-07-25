@@ -241,25 +241,41 @@ export type ColumnMapping = {
 };
 export type InvalidImportRow = {
   rowIndex: number;
-  reason: "invalid_date" | "missing_description";
+  reason: "invalid_date" | "missing_description" | "invalid_amount";
   dateRaw: string;
   descriptionRaw: string;
+};
+
+export type ImportResult = {
+  batchId: string;
+  created: number;
+  skipped: number;
+  total: number;
+  invalidRowCount: number;
+  invalidSamples: InvalidImportRow[];
 };
 
 export const confirmImport = (
   accountId: string,
   payload: { fileContent: string; filename: string; mapping: ColumnMapping; groupId: string; applyRules: boolean }
-) =>
-  api
-    .post<{
-      batchId: string;
-      created: number;
-      skipped: number;
-      total: number;
-      invalidRowCount: number;
-      invalidSamples: InvalidImportRow[];
-    }>(`/import/${accountId}/confirm`, payload)
-    .then((r) => r.data);
+) => api.post<ImportResult>(`/import/${accountId}/confirm`, payload).then((r) => r.data);
+
+// --- IndMoney JSON import ---
+// A parallel import source to CSV: paste the JSON payload from IndMoney's
+// Account Aggregator "All Transactions" screen instead of exporting/uploading
+// a bank statement file. No column mapping needed - the shape is fixed and
+// parsed entirely server-side (see server/src/services/indmoneyImport.ts).
+export type IndmoneySampleRow = { dateISO: string; description: string; amount: number };
+export type IndmoneyPreview = {
+  parsedCount: number;
+  invalidCount: number;
+  sampleRows: IndmoneySampleRow[];
+  groups: Group[];
+};
+export const previewIndmoneyImport = (accountId: string, jsonText: string) =>
+  api.post<IndmoneyPreview>(`/import/${accountId}/indmoney/preview`, { jsonText }).then((r) => r.data);
+export const confirmIndmoneyImport = (accountId: string, payload: { jsonText: string; groupId: string; applyRules: boolean }) =>
+  api.post<ImportResult>(`/import/${accountId}/indmoney/confirm`, payload).then((r) => r.data);
 
 // --- Transfers ---
 export const listTransfers = () => api.get<Transfer[]>("/transfers").then((r) => r.data);

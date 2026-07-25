@@ -128,8 +128,11 @@ export function detectDateFormat(values: string[]): DateFormat {
 }
 
 export type InvalidRow = {
-  rowIndex: number; // 0-based position in the CSV's data rows
-  reason: "invalid_date" | "missing_description";
+  rowIndex: number; // 0-based position within whatever source produced it
+  // "invalid_amount" is unused by the CSV path today (parseAmount defaults
+  // unparseable values to 0 rather than failing) but is here so other import
+  // sources - e.g. the IndMoney JSON importer - can share this exact type.
+  reason: "invalid_date" | "missing_description" | "invalid_amount";
   dateRaw: string;
   descriptionRaw: string;
 };

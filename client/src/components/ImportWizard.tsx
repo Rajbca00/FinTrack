@@ -1,10 +1,22 @@
 import { useRef, useState } from "react";
 import { Modal, Button, Select, Label } from "./ui";
-import { previewImport, confirmImport, getErrorMessage, type ColumnMapping, type DateFormat, type ImportPreview } from "../lib/api";
-import type { Group, InvalidImportRow } from "../lib/api";
+import {
+  previewImport,
+  confirmImport,
+  previewIndmoneyImport,
+  confirmIndmoneyImport,
+  getErrorMessage,
+  type ColumnMapping,
+  type DateFormat,
+  type ImportPreview,
+  type IndmoneyPreview,
+} from "../lib/api";
+import type { Group, ImportResult } from "../lib/api";
+import { formatDate, formatMoney } from "../lib/format";
 import { useQueryClient } from "@tanstack/react-query";
 
-type Mode = "select" | "map" | "done";
+type Source = "csv" | "indmoney";
+type Mode = "select" | "map" | "indmoney-review" | "done";
 
 // Client-side mirror of the server's ambiguous-date interpretation, purely
 // so the mapping step can show "this is how we'll read your first row" next
@@ -38,15 +50,13 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
   const [groupId, setGroupId] = useState(groups.find((g) => g.isDefault)?.id ?? groups[0]?.id ?? "");
   const [applyRules, setApplyRules] = useState(true);
   const [usingSavedMapping, setUsingSavedMapping] = useState(false);
-  const [result, setResult] = useState<{
-    created: number;
-    skipped: number;
-    total: number;
-    invalidRowCount: number;
-    invalidSamples: InvalidImportRow[];
-  } | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [source, setSource] = useState<Source>("csv");
+  const [indmoneyJsonText, setIndmoneyJsonText] = useState("");
+  const [indmoneyPreview, setIndmoneyPreview] = useState<IndmoneyPreview | null>(null);
 
   const applyMapping = (mapping: {
     dateColumn: string | null;
@@ -119,25 +129,168 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
     }
   };
 
+  const parseIndmoneyJson = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const p = await previewIndmoneyImport(accountId, indmoneyJsonText);
+      setIndmoneyPreview(p);
+      if (p.groups.some((g) => g.id === groupId)) {
+        // keep current selection if still valid
+      } else {
+        setGroupId(p.groups.find((g) => g.isDefault)?.id ?? p.groups[0]?.id ?? "");
+      }
+      setMode("indmoney-review");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitIndmoney = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await confirmIndmoneyImport(accountId, { jsonText: indmoneyJsonText, groupId, applyRules });
+      setResult(res);
+      setMode("done");
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["balances"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Modal title="Import statement" onClose={onClose} wide>
       {mode === "select" && (
-        <div className="flex flex-col items-center gap-4 py-8 text-center">
-          <p className="text-sm text-ink-secondary">
-            Upload a CSV export of your bank or credit card statement. Works with common formats (Date/Narration/Debit/Credit,
-            or Date/Description/Amount).
+        <div className="flex flex-col gap-4">
+          <div className="flex justify-center gap-1 rounded-lg bg-white/5 p-1">
+            <button
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                source === "csv" ? "bg-brand text-white" : "text-ink-secondary hover:text-ink"
+              }`}
+              onClick={() => {
+                setSource("csv");
+                setError("");
+              }}
+            >
+              Bank CSV
+            </button>
+            <button
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                source === "indmoney" ? "bg-brand text-white" : "text-ink-secondary hover:text-ink"
+              }`}
+              onClick={() => {
+                setSource("indmoney");
+                setError("");
+              }}
+            >
+              IndMoney JSON
+            </button>
+          </div>
+
+          {source === "csv" ? (
+            <div className="flex flex-col items-center gap-4 py-4 text-center">
+              <p className="text-sm text-ink-secondary">
+                Upload a CSV export of your bank or credit card statement. Works with common formats
+                (Date/Narration/Debit/Credit, or Date/Description/Amount).
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              />
+              <Button onClick={() => fileInputRef.current?.click()} disabled={loading}>
+                {loading ? "Reading file…" : "Choose CSV file"}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 py-4">
+              <p className="text-sm text-ink-secondary">
+                Paste the JSON from IndMoney's Account Aggregator "All Transactions" screen (copied from your browser's
+                network tab). No column mapping needed - dates, merchants, and amounts are read directly.
+              </p>
+              <textarea
+                value={indmoneyJsonText}
+                onChange={(e) => setIndmoneyJsonText(e.target.value)}
+                placeholder='{"data": {"transaction_list": [...]}}'
+                rows={8}
+                className="w-full rounded-lg border border-hairline-strong bg-white/[0.03] px-3 py-2 font-mono text-xs text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none"
+              />
+              <Button onClick={parseIndmoneyJson} disabled={loading || !indmoneyJsonText.trim()} className="self-start">
+                {loading ? "Parsing…" : "Parse JSON"}
+              </Button>
+            </div>
+          )}
+
+          {error && <p className="text-center text-sm text-critical">{error}</p>}
+        </div>
+      )}
+
+      {mode === "indmoney-review" && indmoneyPreview && (
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-ink-muted">
+            {indmoneyPreview.parsedCount} transaction(s) found
+            {indmoneyPreview.invalidCount > 0 && `, ${indmoneyPreview.invalidCount} couldn't be read`}. Review a sample below,
+            then confirm.
           </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-          />
-          <Button onClick={() => fileInputRef.current?.click()} disabled={loading}>
-            {loading ? "Reading file…" : "Choose CSV file"}
-          </Button>
+
+          <div>
+            <Label>Assign transactions to group</Label>
+            <Select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+              {indmoneyPreview.groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-ink-secondary">
+            <input type="checkbox" checked={applyRules} onChange={(e) => setApplyRules(e.target.checked)} />
+            Auto-categorize using my rules
+          </label>
+
+          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-hairline">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-50 dark:bg-white/5">
+                <tr>
+                  <th className="px-2 py-1 text-left font-medium text-ink-muted">Date</th>
+                  <th className="px-2 py-1 text-left font-medium text-ink-muted">Description</th>
+                  <th className="px-2 py-1 text-right font-medium text-ink-muted">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {indmoneyPreview.sampleRows.map((row, i) => (
+                  <tr key={i} className="border-t border-slate-100 dark:border-hairline">
+                    <td className="px-2 py-1 text-ink-secondary">{formatDate(row.dateISO)}</td>
+                    <td className="px-2 py-1 text-ink-secondary">{row.description}</td>
+                    <td className={`px-2 py-1 text-right ${row.amount >= 0 ? "text-good" : "text-ink-secondary"}`}>
+                      {formatMoney(row.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
           {error && <p className="text-sm text-critical">{error}</p>}
+
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setMode("select")}>
+              Back
+            </Button>
+            <Button onClick={submitIndmoney} disabled={loading || !groupId}>
+              {loading ? "Importing…" : "Import"}
+            </Button>
+          </div>
         </div>
       )}
 
