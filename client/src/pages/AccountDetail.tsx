@@ -39,7 +39,6 @@ export function AccountDetail() {
   // account only has one, there's nothing to pick, so use it automatically
   // rather than requiring the (nonexistent) filter chips to select it.
   const effectiveGroupId = activeGroupId ?? (account?.groups.length === 1 ? account.groups[0].id : undefined);
-  const { data: txnData, isLoading } = useTransactions({ accountId: id, groupId: effectiveGroupId, pageSize: 100 });
 
   const { data: trend } = useTrend({ period: "month", accountId: id, groupId: effectiveGroupId });
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | undefined>(undefined);
@@ -49,6 +48,26 @@ export function AccountDetail() {
     if (!trend || trend.length === 0) return undefined;
     return trend.find((t) => t.key === selectedMonthKey) ?? trend[trend.length - 1];
   }, [trend, selectedMonthKey]);
+
+  // The trend endpoint's month "key" is always "yyyy-MM" - turned back into
+  // a UTC date range here so picking a month actually filters the
+  // transaction list below it, not just the Inflow/Outflow tiles.
+  const monthRange = useMemo(() => {
+    if (!activeMonth) return undefined;
+    const [year, month] = activeMonth.key.split("-").map(Number);
+    const from = new Date(Date.UTC(year, month - 1, 1)).toISOString();
+    const to = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)).toISOString();
+    return { from, to };
+  }, [activeMonth]);
+
+  const [search, setSearch] = useState("");
+  const { data: txnData, isLoading } = useTransactions({
+    accountId: id,
+    groupId: effectiveGroupId,
+    q: search || undefined,
+    ...monthRange,
+    pageSize: 100,
+  });
 
   if (!account) return <Loading label="Loading account…" />;
 
@@ -143,7 +162,7 @@ export function AccountDetail() {
               ))}
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <StatCard label="Inflow" value={formatMoney(activeMonth?.income ?? 0, account.currency)} tone="good" />
             <StatCard label="Outflow" value={formatMoney(activeMonth?.expense ?? 0, account.currency)} tone="bad" />
           </div>
@@ -151,14 +170,25 @@ export function AccountDetail() {
       )}
 
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-ink-secondary">Transactions</h2>
+        <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-sm font-semibold text-ink-secondary">Transactions</h2>
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search description…"
+            className="sm:w-64"
+          />
+        </div>
         {isLoading && <Loading />}
-        {!isLoading && txnData && txnData.transactions.length === 0 && (
+        {!isLoading && txnData && txnData.transactions.length === 0 && (!trend || trend.length === 0) && (
           <EmptyState
             title="Import your first statement"
             message="Upload a CSV export from your bank or card to bring in transactions, or add one manually."
             action={{ label: "Import statement", onClick: () => setShowImport(true) }}
           />
+        )}
+        {!isLoading && txnData && txnData.transactions.length === 0 && trend && trend.length > 0 && (
+          <EmptyState title="No matching transactions" message="Try a different month or search term." />
         )}
         {!isLoading && txnData && txnData.transactions.length > 0 && (
           <TransactionTable
