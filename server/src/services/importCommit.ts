@@ -49,7 +49,7 @@ export async function commitImportRows(opts: {
     }
     seenThisBatch.add(key);
 
-    const categoryId = applyRules ? await categorize({ description: row.description, amount: row.amount }) : null;
+    const ruleMatch = applyRules ? await categorize({ description: row.description, amount: row.amount }) : null;
 
     await prisma.transaction.create({
       data: {
@@ -59,7 +59,8 @@ export async function commitImportRows(opts: {
         description: row.description,
         rawDescription: row.description,
         amount: row.amount,
-        categoryId,
+        categoryId: ruleMatch?.categoryId ?? null,
+        notes: ruleMatch?.notes ?? null,
         dedupeKey: key,
         importBatchId: batch.id,
       },

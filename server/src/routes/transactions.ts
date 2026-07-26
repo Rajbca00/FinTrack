@@ -111,10 +111,14 @@ transactionsRouter.post("/", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const data = parsed.data;
 
-  const categoryId = data.categoryId ?? (await categorize({ description: data.description, amount: data.amount }));
+  const ruleMatch = data.categoryId ? null : await categorize({ description: data.description, amount: data.amount });
+  const categoryId = data.categoryId ?? ruleMatch?.categoryId ?? null;
+  // Never overwrite notes the user actually typed into the add-transaction
+  // form - only fall back to the rule's template when they left it blank.
+  const notes = data.notes ?? ruleMatch?.notes ?? null;
 
   const transaction = await prisma.transaction.create({
-    data: { ...data, date: new Date(data.date), categoryId },
+    data: { ...data, date: new Date(data.date), categoryId, notes },
     include: { category: true, group: true },
   });
   res.status(201).json(transaction);

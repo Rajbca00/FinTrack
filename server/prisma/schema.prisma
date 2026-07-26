@@ -94,6 +94,10 @@ model CategoryRule {
   isActive   Boolean      @default(true)
   categoryId String
   category   Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  // Applied to a transaction's notes when this rule matches - only fills in
+  // empty notes, never overwrites something the user (or a prior rule
+  // during CSV import) already wrote there.
+  notes      String?
   createdAt  DateTime     @default(now())
 }
 
