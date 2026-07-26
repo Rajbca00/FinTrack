@@ -28,14 +28,18 @@ export const DEFAULT_CATEGORIES: { name: string; type: CategoryType; color: stri
 
 export const DEFAULT_RULES: { pattern: string; matchType: MatchType; category: string; amountSign?: string }[] = [
   { pattern: "salary", matchType: "CONTAINS", category: "Salary", amountSign: "CREDIT" },
-  { pattern: "swiggy|zomato", matchType: "REGEX", category: "Dining & Food Delivery" },
-  { pattern: "bigbasket|dmart|grocer", matchType: "REGEX", category: "Groceries" },
-  { pattern: "uber|ola|irctc|fuel|petrol", matchType: "REGEX", category: "Transport & Fuel" },
-  { pattern: "electricity|water bill|broadband|recharge", matchType: "REGEX", category: "Utilities" },
-  { pattern: "netflix|prime video|hotstar|spotify", matchType: "REGEX", category: "Entertainment" },
-  { pattern: "pharmacy|hospital|clinic|apollo", matchType: "REGEX", category: "Healthcare" },
-  { pattern: "temple|donation|trust", matchType: "REGEX", category: "Donations / Temple" },
-  { pattern: "amazon|flipkart|myntra", matchType: "REGEX", category: "Shopping" },
+  { pattern: "interest credit|savings interest|dividend", matchType: "REGEX", category: "Interest / Dividends", amountSign: "CREDIT" },
+  { pattern: "swiggy|zomato|dominos|pizza|starbucks|cafe", matchType: "REGEX", category: "Dining & Food Delivery" },
+  { pattern: "bigbasket|dmart|grocer|blinkit|zepto|instamart", matchType: "REGEX", category: "Groceries" },
+  { pattern: "uber|ola|rapido|irctc|fuel|petrol|metro|toll|parking", matchType: "REGEX", category: "Transport & Fuel" },
+  { pattern: "electricity|water bill|broadband|recharge|gas bill|dth|postpaid|mobile bill|internet bill", matchType: "REGEX", category: "Utilities" },
+  { pattern: "rent|\\bemi\\b|home loan|housing loan|loan repayment", matchType: "REGEX", category: "Rent / EMI", amountSign: "DEBIT" },
+  { pattern: "netflix|prime video|hotstar|spotify|bookmyshow|pvr|inox|zee5", matchType: "REGEX", category: "Entertainment" },
+  { pattern: "pharmacy|hospital|clinic|apollo|medplus|1mg|pharmeasy|diagnostic", matchType: "REGEX", category: "Healthcare" },
+  { pattern: "insurance|lic premium|policybazaar|mediclaim", matchType: "REGEX", category: "Insurance", amountSign: "DEBIT" },
+  { pattern: "annual fee|late fee|penalty|processing fee|convenience fee|atm.*fee", matchType: "REGEX", category: "Fees & Charges", amountSign: "DEBIT" },
+  { pattern: "temple|donation|trust|charity|ngo", matchType: "REGEX", category: "Donations / Temple" },
+  { pattern: "amazon|flipkart|myntra|ajio|nykaa|meesho", matchType: "REGEX", category: "Shopping" },
 ];
 
 export async function seedDefaults(client: PrismaClient) {
