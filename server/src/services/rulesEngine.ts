@@ -46,11 +46,14 @@ export function invalidateRuleCache() {
   cachedRules = null;
 }
 
-// Returns the categoryId of the first matching active rule (highest priority first), or null.
-export async function categorize(input: RuleMatchInput): Promise<string | null> {
+export type CategorizeResult = { categoryId: string; notes: string | null };
+
+// Returns the category (and optional notes template) of the first matching
+// active rule (highest priority first), or null if nothing matched.
+export async function categorize(input: RuleMatchInput): Promise<CategorizeResult | null> {
   const rules = await getActiveRules();
   for (const rule of rules) {
-    if (matches(rule, input)) return rule.categoryId;
+    if (matches(rule, input)) return { categoryId: rule.categoryId, notes: rule.notes };
   }
   return null;
 }

@@ -182,6 +182,7 @@ function AddRuleModal({ onClose }: { onClose: () => void }) {
   const [amountSign, setAmountSign] = useState<AmountSign>("ANY");
   const [categoryId, setCategoryId] = useState("");
   const [priority, setPriority] = useState("0");
+  const [notes, setNotes] = useState("");
 
   return (
     <Modal title="Add auto-categorization rule" onClose={onClose}>
@@ -224,11 +225,26 @@ function AddRuleModal({ onClose }: { onClose: () => void }) {
           <Label>Priority (higher runs first)</Label>
           <Input type="number" value={priority} onChange={(e) => setPriority(e.target.value)} />
         </div>
+        <div>
+          <Label>Notes (optional)</Label>
+          <Input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Auto-filled onto matching transactions when left blank"
+          />
+        </div>
         <Button
           className="mt-2"
           disabled={!pattern.trim() || !categoryId}
           onClick={() => {
-            createRule.mutate({ pattern: pattern.trim(), matchType, amountSign, categoryId, priority: Number(priority) || 0 });
+            createRule.mutate({
+              pattern: pattern.trim(),
+              matchType,
+              amountSign,
+              categoryId,
+              priority: Number(priority) || 0,
+              notes: notes.trim() || null,
+            });
             onClose();
           }}
         >
@@ -299,6 +315,7 @@ function EditRuleModal({ rule, onClose }: { rule: CategoryRule; onClose: () => v
   const [amountSign, setAmountSign] = useState<AmountSign>(rule.amountSign);
   const [categoryId, setCategoryId] = useState(rule.categoryId);
   const [priority, setPriority] = useState(String(rule.priority));
+  const [notes, setNotes] = useState(rule.notes ?? "");
 
   return (
     <Modal title="Edit auto-categorization rule" onClose={onClose}>
@@ -340,13 +357,28 @@ function EditRuleModal({ rule, onClose }: { rule: CategoryRule; onClose: () => v
           <Label>Priority (higher runs first)</Label>
           <Input type="number" value={priority} onChange={(e) => setPriority(e.target.value)} />
         </div>
+        <div>
+          <Label>Notes (optional)</Label>
+          <Input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Auto-filled onto matching transactions when left blank"
+          />
+        </div>
         <Button
           className="mt-2"
           disabled={!pattern.trim() || !categoryId}
           onClick={() => {
             updateRule.mutate({
               id: rule.id,
-              data: { pattern: pattern.trim(), matchType, amountSign, categoryId, priority: Number(priority) || 0 },
+              data: {
+                pattern: pattern.trim(),
+                matchType,
+                amountSign,
+                categoryId,
+                priority: Number(priority) || 0,
+                notes: notes.trim() || null,
+              },
             });
             onClose();
           }}

@@ -84,6 +84,7 @@ export type CategoryRule = {
   isActive: boolean;
   categoryId: string;
   category?: Category;
+  notes: string | null;
 };
 
 export type Transaction = {

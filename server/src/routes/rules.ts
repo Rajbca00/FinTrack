@@ -12,6 +12,7 @@ const ruleSchema = z.object({
   amountSign: z.enum(["ANY", "DEBIT", "CREDIT"]).default("ANY"),
   priority: z.number().default(0),
   isActive: z.boolean().default(true),
+  notes: z.string().optional().nullable(),
 });
 
 rulesRouter.get("/", async (_req, res) => {
@@ -62,9 +63,16 @@ rulesRouter.post("/apply", async (req, res) => {
 
   let updated = 0;
   for (const t of txns) {
-    const categoryId = await categorize({ description: t.description, amount: t.amount });
-    if (categoryId && categoryId !== t.categoryId) {
-      await prisma.transaction.update({ where: { id: t.id }, data: { categoryId } });
+    const ruleMatch = await categorize({ description: t.description, amount: t.amount });
+    if (!ruleMatch) continue;
+    // `overwrite` only ever governs re-categorizing - notes are freeform
+    // text a user may have written, so a rule's notes template only ever
+    // fills in a blank, regardless of the overwrite flag.
+    const data: { categoryId?: string; notes?: string } = {};
+    if (ruleMatch.categoryId !== t.categoryId) data.categoryId = ruleMatch.categoryId;
+    if (ruleMatch.notes && !t.notes) data.notes = ruleMatch.notes;
+    if (Object.keys(data).length > 0) {
+      await prisma.transaction.update({ where: { id: t.id }, data });
       updated++;
     }
   }
