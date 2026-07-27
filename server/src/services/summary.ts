@@ -142,14 +142,12 @@ export async function getBalances() {
   const results = [];
   for (const account of accounts) {
     const groupResults = [];
-    let accountBalance = 0;
     for (const group of account.groups) {
       const agg = await prisma.transaction.aggregate({
         where: { groupId: group.id },
         _sum: { amount: true },
       });
       const balance = group.openingBalance + (agg._sum.amount ?? 0);
-      accountBalance += balance;
       groupResults.push({
         id: group.id,
         name: group.name,
@@ -160,6 +158,21 @@ export async function getBalances() {
         transactionCount: group._count.transactions,
       });
     }
+
+    // The account's total is computed directly against every transaction
+    // on the account (not by summing the per-group balances above), so it
+    // can never drift from those figures - a transaction whose group was
+    // since archived, deleted and recreated, or otherwise doesn't match one
+    // of the *currently listed* non-archived groups above would silently
+    // vanish from a sum-of-groups total while still being real money that
+    // happened to this account. Mirrors the account-wide running-balance
+    // calculation in transactions.ts, which has the same requirement.
+    const [allGroups, accountAgg] = await Promise.all([
+      prisma.group.findMany({ where: { accountId: account.id }, select: { openingBalance: true } }),
+      prisma.transaction.aggregate({ where: { accountId: account.id }, _sum: { amount: true } }),
+    ]);
+    const accountBalance = allGroups.reduce((sum, g) => sum + g.openingBalance, 0) + (accountAgg._sum.amount ?? 0);
+
     results.push({
       id: account.id,
       name: account.name,
