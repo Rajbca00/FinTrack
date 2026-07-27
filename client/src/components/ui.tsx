@@ -32,7 +32,11 @@ export function Button({
   }[variant];
   return (
     <button
-      className={clsx("rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed", styles, className)}
+      className={clsx(
+        "rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed active:scale-[0.97]",
+        styles,
+        className
+      )}
       {...props}
     />
   );
@@ -77,17 +81,25 @@ export function Badge({ color, children }: { color?: string | null; children: Re
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div
+      className="animate-overlay-in fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
       <div
         className={clsx(
-          "max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-hairline bg-surface p-6 shadow-2xl shadow-black/40",
-          wide ? "max-w-2xl" : "max-w-md"
+          "animate-sheet-in sm:animate-modal-in max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border-t border-hairline bg-surface p-6 shadow-2xl shadow-black/40 sm:rounded-2xl sm:border",
+          wide ? "sm:max-w-2xl" : "sm:max-w-md"
         )}
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-ink">{title}</h2>
-          <button onClick={onClose} className="text-ink-muted hover:text-ink" aria-label="Close">
+          <button
+            onClick={onClose}
+            className="-mr-1.5 -mt-1.5 rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
+            aria-label="Close"
+          >
             ✕
           </button>
         </div>
@@ -139,7 +151,7 @@ export function Toast({
 }) {
   return (
     <div className="fixed inset-x-0 bottom-20 z-50 flex justify-center px-4 sm:bottom-6">
-      <div className="flex items-center gap-3 rounded-full border border-hairline-strong bg-surface px-4 py-2 text-sm text-ink shadow-2xl shadow-black/40">
+      <div className="animate-toast-in flex items-center gap-3 rounded-full border border-hairline-strong bg-surface px-4 py-2 text-sm text-ink shadow-2xl shadow-black/40">
         <span>{message}</span>
         {actionLabel && onAction && (
           <button className="font-semibold text-brand hover:underline" onClick={onAction}>

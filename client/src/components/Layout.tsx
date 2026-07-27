@@ -101,13 +101,18 @@ export function Layout() {
       </aside>
 
       <main className="flex-1 overflow-x-hidden px-4 pb-24 pt-6 md:px-8 md:pb-6">
-        <Outlet />
+        <div key={location.pathname} className="animate-page-in">
+          <Outlet />
+        </div>
       </main>
 
       {showMore && (
-        <div className="fixed inset-0 z-40 flex items-end bg-black/60 md:hidden" onClick={() => setShowMore(false)}>
+        <div
+          className="animate-overlay-in fixed inset-0 z-40 flex items-end bg-black/60 md:hidden"
+          onClick={() => setShowMore(false)}
+        >
           <div
-            className="w-full rounded-t-2xl border-t border-hairline bg-surface p-4 pb-8"
+            className="animate-sheet-in w-full rounded-t-2xl border-t border-hairline bg-surface p-4 pb-8"
             style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
             onClick={(e) => e.stopPropagation()}
           >
