@@ -56,10 +56,14 @@ transactionsRouter.get("/", async (req, res) => {
     }),
   ]);
 
-  // A running balance is only well-defined when scoped to a single group
-  // (mixing groups/accounts has no one coherent balance to run), and needs
-  // every one of that group's transactions - not just this page - to add up
-  // correctly, so it's computed from a separate, unpaginated query.
+  // A running balance is only well-defined when scoped to a single group or
+  // a single account (mixing multiple accounts has no one coherent balance
+  // to run), and needs every one of that scope's transactions - not just
+  // this page - to add up correctly, so it's computed from a separate,
+  // unpaginated query. Account-scoped (no specific group) sums every
+  // group's opening balance and every transaction across the account, so
+  // viewing "all groups" on an account still gets a real running balance
+  // instead of requiring one group to be picked.
   let runningBalances: Record<string, number> | undefined;
   if (groupId) {
     const group = await prisma.group.findUnique({ where: { id: groupId } });
@@ -72,6 +76,21 @@ transactionsRouter.get("/", async (req, res) => {
       runningBalances = {};
       let running = group.openingBalance;
       for (const t of allInGroup) {
+        running += t.amount;
+        runningBalances[t.id] = running;
+      }
+    }
+  } else if (accountId) {
+    const groups = await prisma.group.findMany({ where: { accountId } });
+    if (groups.length > 0) {
+      const allInAccount = await prisma.transaction.findMany({
+        where: { accountId },
+        orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+        select: { id: true, amount: true },
+      });
+      runningBalances = {};
+      let running = groups.reduce((sum, g) => sum + g.openingBalance, 0);
+      for (const t of allInAccount) {
         running += t.amount;
         runningBalances[t.id] = running;
       }
