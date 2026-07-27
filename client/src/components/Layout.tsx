@@ -71,7 +71,7 @@ export function Layout() {
                 onClick={() => setCollapsed(true)}
                 aria-label="Collapse sidebar"
                 title="Collapse sidebar"
-                className="rounded-lg p-1.5 text-ink-muted hover:bg-white/5 hover:text-ink"
+                className="rounded-lg p-1.5 text-ink-muted hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
               >
                 <IconChevron collapsed={collapsed} />
               </button>
@@ -89,7 +89,7 @@ export function Layout() {
                 clsx(
                   "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   collapsed && "justify-center px-0",
-                  isActive ? "bg-brand/15 text-brand" : "text-ink-secondary hover:bg-white/5 hover:text-ink"
+                  isActive ? "bg-brand/15 text-brand" : "text-ink-secondary hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
                 )
               }
             >
@@ -127,7 +127,7 @@ export function Layout() {
                   className={({ isActive }) =>
                     clsx(
                       "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium",
-                      isActive ? "bg-brand/15 text-brand" : "text-ink-secondary hover:bg-white/5 hover:text-ink"
+                      isActive ? "bg-brand/15 text-brand" : "text-ink-secondary hover:bg-black/5 hover:text-ink dark:hover:bg-white/5"
                     )
                   }
                 >

@@ -1,11 +1,30 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" class="dark theme-midnight">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0d0d0d" />
     <title>FinTrack</title>
+    <script>
+      // Applies the stored theme before first paint so switching themes
+      // doesn't flash the default (Midnight, set as this tag's static
+      // class above) on every reload - kept as plain inline JS rather than
+      // importing lib/theme.ts since this has to run synchronously, before
+      // any module script.
+      (function () {
+        try {
+          var id = localStorage.getItem("fintrack.theme");
+          if (id === "classic-blue") {
+            document.documentElement.className = "dark theme-classic-blue";
+            document.querySelector('meta[name="theme-color"]').setAttribute("content", "#161a23");
+          } else if (id === "daylight") {
+            document.documentElement.className = "theme-daylight";
+            document.querySelector('meta[name="theme-color"]').setAttribute("content", "#f4f6f9");
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

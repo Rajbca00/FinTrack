@@ -1,16 +1,18 @@
 @import "tailwindcss";
 
-/* The app ships one signature dark theme rather than following the OS
-   light/dark preference, so `dark:` is driven by the `.dark` class on
-   <html> (set permanently in index.html) instead of prefers-color-scheme. */
+/* The app ships a fixed set of hand-picked themes rather than following the
+   OS light/dark preference, so `dark:` is driven by the `.dark` class on
+   <html> (applied whenever the active theme is dark-toned - see
+   lib/theme.ts) instead of prefers-color-scheme. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Semantic tokens for the dark theme, sourced from the dataviz skill's
-   validated dark chart-chrome/ink values (see client/src/lib/palette.ts)
-   so the UI chrome and the chart panels read as one consistent surface
-   instead of two mismatched dark grays. Brand accent reuses the same blue
-   already used for "income" in charts, rather than inventing an
-   unvalidated new hue. */
+/* Semantic tokens - every component styles itself against these names
+   (bg-page, text-ink, bg-brand, ...) rather than raw Tailwind colors, so a
+   theme swap only ever needs to change the values below, never a component.
+   The @theme block seeds Tailwind's utility generation with the default
+   (Midnight) values; each .theme-* block overrides the same custom
+   properties for the other themes, and lib/theme.ts swaps which one is
+   active by setting the class on <html>. */
 @theme {
   --color-page: #0d0d0d;
   --color-surface: #1a1a19;
@@ -26,8 +28,46 @@
   --color-critical: #d03b3b;
 }
 
-:root {
+.theme-midnight {
   color-scheme: dark;
+}
+
+/* A lighter, blue-tinted charcoal (not pure black) with a bolder, more
+   saturated "classic" royal blue accent than Midnight's softer default. */
+.theme-classic-blue {
+  color-scheme: dark;
+  --color-page: #161a23;
+  --color-surface: #1f2530;
+  --color-surface-hover: rgba(255, 255, 255, 0.07);
+  --color-hairline: rgba(255, 255, 255, 0.12);
+  --color-hairline-strong: rgba(255, 255, 255, 0.18);
+  --color-ink: #eef1f7;
+  --color-ink-secondary: #aab4c7;
+  --color-ink-muted: #77839c;
+  --color-brand: #2f6fed;
+  --color-brand-hover: #4a83f0;
+  --color-good: #22c55e;
+  --color-critical: #ef4444;
+}
+
+/* A true light theme - components that still carry their original
+   pre-dark-mode literal Tailwind classes (slate-50/slate-200/etc, paired
+   with a dark: override) fall back to those automatically here since this
+   is the one theme that doesn't apply .dark. */
+.theme-daylight {
+  color-scheme: light;
+  --color-page: #f4f6f9;
+  --color-surface: #ffffff;
+  --color-surface-hover: rgba(0, 0, 0, 0.04);
+  --color-hairline: rgba(0, 0, 0, 0.1);
+  --color-hairline-strong: rgba(0, 0, 0, 0.18);
+  --color-ink: #12151c;
+  --color-ink-secondary: #4b5568;
+  --color-ink-muted: #838d9e;
+  --color-brand: #2f6fed;
+  --color-brand-hover: #1f5bd6;
+  --color-good: #16a34a;
+  --color-critical: #dc2626;
 }
 
 html,
