@@ -26,9 +26,9 @@ export function Button({
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost" }) {
   const styles = {
     primary: "bg-brand text-white hover:bg-brand-hover disabled:bg-brand/40",
-    secondary: "bg-white/5 text-ink hover:bg-white/10",
+    secondary: "bg-black/5 text-ink hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10",
     danger: "bg-critical/10 text-critical hover:bg-critical/15",
-    ghost: "text-ink-secondary hover:bg-white/5",
+    ghost: "text-ink-secondary hover:bg-black/5 dark:hover:bg-white/5",
   }[variant];
   return (
     <button
@@ -154,7 +154,7 @@ export function Toast({
 export function ProgressBar({ value, color }: { value: number; color?: string }) {
   const pct = Math.max(0, Math.min(100, value));
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+    <div className="h-2 w-full overflow-hidden rounded-full bg-black/5 dark:bg-white/5">
       <div className="h-full rounded-full transition-[width]" style={{ width: `${pct}%`, background: color ?? "var(--color-brand)" }} />
     </div>
   );

@@ -334,7 +334,7 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
     <button
       onClick={onClick}
       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-        active ? "border-brand bg-brand text-white" : "border-hairline-strong text-ink-secondary hover:bg-white/5"
+        active ? "border-brand bg-brand text-white" : "border-hairline-strong text-ink-secondary hover:bg-black/5 dark:hover:bg-white/5"
       }`}
     >
       {label}

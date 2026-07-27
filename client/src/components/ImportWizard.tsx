@@ -209,7 +209,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
     <Modal title="Import statement" onClose={onClose} wide>
       {mode === "select" && (
         <div className="flex flex-col gap-4">
-          <div className="flex justify-center gap-1 rounded-lg bg-white/5 p-1">
+          <div className="flex justify-center gap-1 rounded-lg bg-black/5 p-1 dark:bg-white/5">
             <button
               className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                 source === "csv" ? "bg-brand text-white" : "text-ink-secondary hover:text-ink"

@@ -201,7 +201,7 @@ export function TransactionTable({
                 <Select
                   value={t.categoryId ?? ""}
                   onChange={(e) => handleCategoryChange(t, e.target.value)}
-                  className="w-auto rounded-full border-hairline-strong bg-white/5 py-1 pl-2.5 text-xs"
+                  className="w-auto rounded-full border-hairline-strong bg-black/5 py-1 pl-2.5 text-xs dark:bg-white/5"
                 >
                   <option value="">Uncategorized</option>
                   {assignableCategories(categories).map((c) => (
@@ -214,7 +214,7 @@ export function TransactionTable({
                   <Select
                     value={t.groupId}
                     onChange={(e) => updateTransaction.mutate({ id: t.id, data: { groupId: e.target.value } })}
-                    className="w-auto rounded-full border-hairline-strong bg-white/5 py-1 pl-2.5 text-xs"
+                    className="w-auto rounded-full border-hairline-strong bg-black/5 py-1 pl-2.5 text-xs dark:bg-white/5"
                   >
                     {groups.map((g) => (
                       <option key={g.id} value={g.id}>
@@ -275,7 +275,7 @@ export function TransactionTable({
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-hairline">
             {visibleTransactions.map((t) => (
-              <tr key={t.id} className="hover:bg-white/5">
+              <tr key={t.id} className="hover:bg-black/5 dark:hover:bg-white/5">
                 <td className="px-4 py-2">
                   {!t.isTransfer && (
                     <input

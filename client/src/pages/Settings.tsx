@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, Button, Modal, Input } from "../components/ui";
 import { exportData, importData, resetApp, getErrorMessage } from "../lib/api";
+import { useTheme } from "../hooks/useTheme";
+import { THEMES } from "../lib/theme";
 
 const RESET_PHRASE = "RESET";
 
@@ -14,6 +16,7 @@ export function Settings() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [resetting, setResetting] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   const handleExport = async () => {
     setExporting(true);
@@ -153,9 +156,28 @@ export function Settings() {
       <div>
         <h2 className="mb-2 text-sm font-semibold text-ink-secondary">Appearance</h2>
         <Card>
-          <p className="text-sm text-ink-secondary">
-            FinTrack uses a single dark theme by design - there's no light mode to switch to.
-          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {THEMES.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTheme(t.id)}
+                className={`flex flex-col gap-2 rounded-xl border p-3 text-left transition-colors ${
+                  theme === t.id ? "border-brand ring-1 ring-brand" : "border-hairline hover:border-hairline-strong"
+                }`}
+              >
+                <div className="flex overflow-hidden rounded-lg border border-hairline">
+                  <div className="h-10 flex-1" style={{ background: t.swatch.page }} />
+                  <div className="h-10 flex-1" style={{ background: t.swatch.surface }} />
+                  <div className="h-10 flex-1" style={{ background: t.swatch.brand }} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-ink">{t.name}</p>
+                  {theme === t.id && <span className="text-xs font-medium text-brand">Active</span>}
+                </div>
+                <p className="text-xs text-ink-muted">{t.description}</p>
+              </button>
+            ))}
+          </div>
         </Card>
       </div>
 
