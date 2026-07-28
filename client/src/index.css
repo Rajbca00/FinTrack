@@ -83,3 +83,66 @@ body {
 ::selection {
   background: color-mix(in srgb, var(--color-brand) 35%, transparent);
 }
+
+/* Shared entrance animations for overlays, sheets/modals, toasts, and page
+   content. Defined via @utility (not a plain class) so responsive variants
+   like `sm:animate-modal-in` work - Modal needs a different animation on
+   mobile (slide up as a bottom sheet) vs desktop (scale in as a dialog). */
+@keyframes overlay-in {
+  from { opacity: 0; }
+}
+
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@utility animate-overlay-in {
+  animation: overlay-in 0.15s ease-out;
+}
+
+@utility animate-sheet-in {
+  animation: sheet-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility animate-modal-in {
+  animation: modal-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility animate-toast-in {
+  animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility animate-page-in {
+  animation: page-in 0.18s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-overlay-in,
+  .animate-sheet-in,
+  .animate-modal-in,
+  .animate-toast-in,
+  .animate-page-in {
+    animation: none;
+  }
+}

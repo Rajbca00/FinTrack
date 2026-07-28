@@ -103,6 +103,7 @@ export function Categories() {
                       type="checkbox"
                       checked={r.isActive}
                       onChange={(e) => updateRule.mutate({ id: r.id, data: { isActive: e.target.checked } })}
+                      className="h-4 w-4 accent-brand"
                     />
                   </td>
                   <td className="px-4 py-2 text-right">

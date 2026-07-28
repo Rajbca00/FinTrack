@@ -322,7 +322,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
           </div>
 
           <label className="flex items-center gap-2 text-sm text-ink-secondary">
-            <input type="checkbox" checked={applyRules} onChange={(e) => setApplyRules(e.target.checked)} />
+            <input type="checkbox" checked={applyRules} onChange={(e) => setApplyRules(e.target.checked)} className="h-4 w-4 accent-brand" />
             Auto-categorize using my rules
           </label>
 
@@ -498,7 +498,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
           </div>
 
           <label className="flex items-center gap-2 text-sm text-ink-secondary">
-            <input type="checkbox" checked={applyRules} onChange={(e) => setApplyRules(e.target.checked)} />
+            <input type="checkbox" checked={applyRules} onChange={(e) => setApplyRules(e.target.checked)} className="h-4 w-4 accent-brand" />
             Auto-categorize using my rules
           </label>
 

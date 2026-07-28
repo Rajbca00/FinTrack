@@ -172,7 +172,7 @@ export function TransactionTable({
                     checked={selectedIds.has(t.id)}
                     onChange={() => toggleOne(t.id)}
                     aria-label={`Select transaction ${t.description}`}
-                    className="shrink-0"
+                    className="h-4 w-4 shrink-0 accent-brand"
                   />
                 )}
                 <div
@@ -260,6 +260,7 @@ export function TransactionTable({
                   onChange={toggleAll}
                   aria-label="Select all transactions"
                   disabled={selectableIds.length === 0}
+                  className="h-4 w-4 accent-brand"
                 />
               </th>
               <th className="px-4 py-2 font-medium">Date</th>
@@ -283,6 +284,7 @@ export function TransactionTable({
                       checked={selectedIds.has(t.id)}
                       onChange={() => toggleOne(t.id)}
                       aria-label={`Select transaction ${t.description}`}
+                      className="h-4 w-4 accent-brand"
                     />
                   )}
                 </td>
@@ -666,7 +668,7 @@ function RuleSuggestionModal({
           <Input value={pattern} onChange={(e) => setPattern(e.target.value)} />
         </div>
         <label className="flex items-center gap-2 text-sm text-ink-secondary">
-          <input type="checkbox" checked={alsoApply} onChange={(e) => setAlsoApply(e.target.checked)} />
+          <input type="checkbox" checked={alsoApply} onChange={(e) => setAlsoApply(e.target.checked)} className="h-4 w-4 accent-brand" />
           Also apply {categoryName} to these {similar.length} transaction{similar.length === 1 ? "" : "s"} now
         </label>
         <div className="max-h-32 overflow-y-auto rounded-lg border border-hairline text-xs">
