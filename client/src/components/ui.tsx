@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import clsx from "clsx";
+import { formatMoney } from "../lib/format";
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return (
@@ -168,6 +169,34 @@ export function ProgressBar({ value, color }: { value: number; color?: string })
   return (
     <div className="h-2 w-full overflow-hidden rounded-full bg-black/5 dark:bg-white/5">
       <div className="h-full rounded-full transition-[width]" style={{ width: `${pct}%`, background: color ?? "var(--color-brand)" }} />
+    </div>
+  );
+}
+
+// Shared recharts tooltip - used by any chart across the app so styling
+// only needs to be kept theme-aware (light/dark pairs) in one place.
+export function ChartTooltip({
+  active,
+  payload,
+  label,
+  currency,
+}: {
+  active?: boolean;
+  payload?: { name: string; value: number; color: string }[];
+  label?: string;
+  currency?: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-hairline-strong dark:bg-surface">
+      {label && <p className="mb-1 font-medium text-ink-secondary">{label}</p>}
+      {payload.map((p) => (
+        <div key={p.name} className="flex items-center gap-2 text-ink-secondary">
+          <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+          <span>{p.name}:</span>
+          <span className="font-medium text-ink">{formatMoney(p.value, currency)}</span>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { useBudgets, useCreateBudget, useUpdateBudget, useDeleteBudget, useCategories } from "../hooks/useApi";
-import { Card, Button, Modal, Input, Select, Label, EmptyState, ProgressBar, Badge, Loading } from "../components/ui";
+import { useMemo, useState } from "react";
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useBudgets, useBudgetMonthlyTrend, useCreateBudget, useUpdateBudget, useDeleteBudget, useCategories } from "../hooks/useApi";
+import { Card, Button, Modal, Input, Select, Label, EmptyState, ProgressBar, Badge, Loading, ChartTooltip, StatCard } from "../components/ui";
 import { assignableCategories } from "../lib/api";
 import { formatMoney } from "../lib/format";
 import type { Budget, BudgetPeriod } from "../lib/api";
@@ -9,9 +10,21 @@ const PERIOD_LABELS: Record<BudgetPeriod, string> = { MONTHLY: "Monthly", QUARTE
 
 export function Budgets() {
   const { data: budgets, isLoading } = useBudgets();
+  const { data: trend } = useBudgetMonthlyTrend(6);
   const deleteBudget = useDeleteBudget();
   const [showAdd, setShowAdd] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+
+  const hasBudgets = (budgets?.length ?? 0) > 0;
+
+  // Each budget already carries amount/spent for its own current period (see
+  // withSpend on the server), so the overall total is just a straight sum
+  // across whatever's currently active - no separate endpoint needed.
+  const overall = useMemo(() => {
+    const planned = budgets?.reduce((sum, b) => sum + b.amount, 0) ?? 0;
+    const consumed = budgets?.reduce((sum, b) => sum + b.spent, 0) ?? 0;
+    return { planned, consumed, remaining: planned - consumed };
+  }, [budgets]);
 
   return (
     <div>
@@ -26,12 +39,63 @@ export function Budgets() {
       </div>
 
       {isLoading && <Loading />}
-      {!isLoading && (budgets?.length ?? 0) === 0 && (
+      {!isLoading && !hasBudgets && (
         <EmptyState
           title="Set your first budget"
           message="Set a monthly limit for a category like Groceries or Dining Out and track spending against it."
           action={{ label: "+ Add budget", onClick: () => setShowAdd(true) }}
         />
+      )}
+
+      {hasBudgets && (
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard label="Planned this period" value={formatMoney(overall.planned)} />
+          <StatCard label="Consumed this period" value={formatMoney(overall.consumed)} tone={overall.remaining < 0 ? "bad" : undefined} />
+          <StatCard
+            label={overall.remaining < 0 ? "Over budget" : "Remaining"}
+            value={formatMoney(Math.abs(overall.remaining))}
+            tone={overall.remaining < 0 ? "bad" : "good"}
+          />
+        </div>
+      )}
+
+      {hasBudgets && (
+        <Card className="mb-4">
+          <h2 className="mb-1 text-sm font-semibold text-ink-secondary">Overall: planned vs. consumed</h2>
+          <p className="mb-3 text-xs text-ink-muted">
+            Combined across every active budget's own current period (monthly, quarterly, or yearly, as set per category).
+          </p>
+          <ProgressBar
+            value={overall.planned > 0 ? (overall.consumed / overall.planned) * 100 : 0}
+            color={overall.remaining < 0 ? "var(--color-critical)" : undefined}
+          />
+        </Card>
+      )}
+
+      {hasBudgets && trend && trend.months.length > 0 && (
+        <Card className="mb-4">
+          <h2 className="mb-1 text-sm font-semibold text-ink-secondary">Month on month</h2>
+          <p className="mb-3 text-xs text-ink-muted">
+            Actual spend in budgeted categories vs. today's combined monthly budget target of {formatMoney(trend.totalPlanned)}.
+          </p>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={trend.months} barCategoryGap="24%">
+              <CartesianGrid vertical={false} stroke="var(--color-hairline)" />
+              <XAxis dataKey="label" tick={{ fill: "var(--color-ink-muted)", fontSize: 12 }} axisLine={{ stroke: "var(--color-hairline-strong)" }} tickLine={false} />
+              <YAxis
+                tick={{ fill: "var(--color-ink-muted)", fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+                width={80}
+                tickFormatter={(v) => formatMoney(v)}
+              />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: "var(--color-surface-hover)" }} />
+              <Legend wrapperStyle={{ fontSize: 12, color: "var(--color-ink-secondary)" }} />
+              <Bar dataKey="planned" name="Planned" fill="var(--color-ink-muted)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="spent" name="Spent" fill="var(--color-brand)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

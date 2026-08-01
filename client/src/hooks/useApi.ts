@@ -386,6 +386,10 @@ export function useDeleteBudget() {
   return useMutation({ mutationFn: api.deleteBudget, onSuccess: () => qc.invalidateQueries({ queryKey: ["budgets"] }) });
 }
 
+export function useBudgetMonthlyTrend(months = 6) {
+  return useQuery({ queryKey: ["budgets", "monthly-trend", months], queryFn: () => api.getBudgetMonthlyTrend(months) });
+}
+
 export function useBills() {
   return useQuery({ queryKey: ["bills"], queryFn: api.listBills });
 }
