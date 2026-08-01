@@ -27,7 +27,7 @@ import {
   useNetWorthTrend,
   useTrend,
 } from "../hooks/useApi";
-import { Card, Select, Label, ProgressBar, Badge, StatCard } from "../components/ui";
+import { Card, Select, Label, ProgressBar, Badge, StatCard, ChartTooltip } from "../components/ui";
 import { formatMoney, formatDate } from "../lib/format";
 import { CHROME, DIVERGING, categoricalColor } from "../lib/palette";
 import { usePersistentState } from "../hooks/usePersistentState";
@@ -609,22 +609,6 @@ function BillGroupColumn({ title, bills }: { title: string; bills: Bill[] }) {
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-function ChartTooltip({ active, payload, label, currency }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string; currency: string }) {
-  if (!active || !payload || payload.length === 0) return null;
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-hairline-strong dark:bg-surface">
-      {label && <p className="mb-1 font-medium text-ink-secondary">{label}</p>}
-      {payload.map((p) => (
-        <div key={p.name} className="flex items-center gap-2 text-ink-secondary">
-          <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
-          <span>{p.name}:</span>
-          <span className="font-medium text-ink">{formatMoney(p.value, currency)}</span>
-        </div>
-      ))}
     </div>
   );
 }

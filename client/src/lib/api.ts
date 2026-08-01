@@ -431,6 +431,12 @@ export const updateBudget = (id: string, data: Partial<{ categoryId: string; amo
   api.put<Budget>(`/budgets/${id}`, data).then((r) => r.data);
 export const deleteBudget = (id: string) => api.delete(`/budgets/${id}`);
 
+export type BudgetMonthlyTrendPoint = { month: string; label: string; planned: number; spent: number };
+export type BudgetMonthlyTrend = { months: BudgetMonthlyTrendPoint[]; totalPlanned: number };
+
+export const getBudgetMonthlyTrend = (months = 6) =>
+  api.get<BudgetMonthlyTrend>("/budgets/monthly-trend", { params: { months } }).then((r) => r.data);
+
 // --- Bills ---
 export type BillRecurrence = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "YEARLY";
 
