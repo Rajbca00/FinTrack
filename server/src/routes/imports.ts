@@ -1,14 +1,38 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { parseCsv, suggestMapping, normalizeRows, detectDateFormat, ColumnMapping } from "../services/csvImport";
+import { parseCsv, suggestMapping, normalizeRows, detectDateFormat, ColumnMapping, ParsedCsv } from "../services/csvImport";
+import { parseSpreadsheet } from "../services/spreadsheetImport";
 import { parseIndmoneyPayload } from "../services/indmoneyImport";
 import { commitImportRows } from "../services/importCommit";
 
 export const importsRouter = Router();
 
+// Base64 inflates the raw file size by ~4/3 - 7MB raw keeps the encoded
+// payload comfortably under app.ts's express.json 10mb limit.
+const MAX_UPLOAD_BYTES = 7 * 1024 * 1024;
+
+// A CSV is sent as raw text (`fileContent`); a real .xlsx/.xls binary can't
+// be, so it's sent base64-encoded (`data`, same convention as the PDF
+// importers below) - either way this resolves to the same {headers, rows}
+// shape parseCsv() produces, so every step after this (mapping detection,
+// normalizeRows, the whole column-mapping UI) is unchanged and doesn't
+// know or care which format the file actually was.
+async function parseUpload(input: { fileContent?: string; data?: string }): Promise<ParsedCsv> {
+  if (input.data) {
+    const size = Buffer.byteLength(input.data, "base64");
+    if (size > MAX_UPLOAD_BYTES) {
+      throw new Error(`File too large (max ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB)`);
+    }
+    return parseSpreadsheet(Buffer.from(input.data, "base64"));
+  }
+  if (input.fileContent) return parseCsv(input.fileContent);
+  throw new Error("No file content provided");
+}
+
 const previewSchema = z.object({
-  fileContent: z.string().min(1),
+  fileContent: z.string().min(1).optional(),
+  data: z.string().min(1).optional(),
   filename: z.string().default("statement.csv"),
 });
 
@@ -22,8 +46,13 @@ importsRouter.post("/:accountId/preview", async (req, res) => {
   });
   if (!account) return res.status(404).json({ error: "Account not found" });
 
-  const { headers, rows } = parseCsv(parsed.data.fileContent);
-  if (headers.length === 0) return res.status(400).json({ error: "Could not find a header row in this CSV" });
+  let headers: string[], rows: Record<string, string>[];
+  try {
+    ({ headers, rows } = await parseUpload(parsed.data));
+  } catch (e) {
+    return res.status(400).json({ error: e instanceof Error ? e.message : "Could not read this file" });
+  }
+  if (headers.length === 0) return res.status(400).json({ error: "Could not find a header row in this file" });
 
   // Only offer the account's last mapping back if this file actually has the
   // same columns - a different statement format uploaded to the same account
@@ -78,7 +107,8 @@ const columnMappingSchema = z.object({
 });
 
 const confirmSchema = z.object({
-  fileContent: z.string().min(1),
+  fileContent: z.string().min(1).optional(),
+  data: z.string().min(1).optional(),
   filename: z.string().default("statement.csv"),
   mapping: columnMappingSchema,
   groupId: z.string().min(1),
@@ -88,7 +118,7 @@ const confirmSchema = z.object({
 importsRouter.post("/:accountId/confirm", async (req, res) => {
   const parsed = confirmSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { fileContent, filename, mapping, groupId, applyRules } = parsed.data;
+  const { fileContent, data, filename, mapping, groupId, applyRules } = parsed.data;
   const accountId = req.params.accountId;
 
   const group = await prisma.group.findUnique({ where: { id: groupId } });
@@ -96,7 +126,12 @@ importsRouter.post("/:accountId/confirm", async (req, res) => {
     return res.status(400).json({ error: "Group does not belong to this account" });
   }
 
-  const { rows } = parseCsv(fileContent);
+  let rows: Record<string, string>[];
+  try {
+    ({ rows } = await parseUpload({ fileContent, data }));
+  } catch (e) {
+    return res.status(400).json({ error: e instanceof Error ? e.message : "Could not read this file" });
+  }
   const { rows: normalized, invalid } = normalizeRows(rows, mapping as ColumnMapping);
   if (normalized.length === 0) {
     const invalidDates = invalid.filter((r) => r.reason === "invalid_date").length;
@@ -205,10 +240,6 @@ importsRouter.post("/:accountId/indmoney/confirm", async (req, res) => {
   res.status(201).json(result);
 });
 
-// Base64 inflates the raw file size by ~4/3 - 7MB raw keeps the encoded
-// payload comfortably under app.ts's express.json 10mb limit.
-const MAX_PDF_BYTES = 7 * 1024 * 1024;
-
 const indmoneyPdfPreviewSchema = z.object({
   filename: z.string().default("statement.pdf"),
   data: z.string().min(1), // base64, no data: URL prefix
@@ -216,8 +247,8 @@ const indmoneyPdfPreviewSchema = z.object({
 
 async function parsePdfUpload(data: string) {
   const size = Buffer.byteLength(data, "base64");
-  if (size > MAX_PDF_BYTES) {
-    throw new Error(`PDF too large (max ${MAX_PDF_BYTES / (1024 * 1024)}MB)`);
+  if (size > MAX_UPLOAD_BYTES) {
+    throw new Error(`PDF too large (max ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB)`);
   }
   // Loaded lazily (not as a top-level import) so that if pdf-parse ever fails
   // to load in a given deployment environment - it's happened before with a
@@ -310,6 +341,193 @@ importsRouter.post("/:accountId/indmoney-pdf/confirm", async (req, res) => {
 
   res.status(201).json(result);
 });
+
+async function parseIciciPdfUpload(data: string) {
+  const size = Buffer.byteLength(data, "base64");
+  if (size > MAX_UPLOAD_BYTES) {
+    throw new Error(`PDF too large (max ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB)`);
+  }
+  let parseIciciPdf: (buf: Buffer) => Promise<import("../services/csvImport").NormalizeResult>;
+  try {
+    ({ parseIciciPdf } = await import("../services/iciciPdfImport.js"));
+  } catch (e) {
+    console.error("Failed to load iciciPdfImport module:", e);
+    throw new Error("ICICI PDF statement import is temporarily unavailable - try CSV instead.");
+  }
+  return parseIciciPdf(Buffer.from(data, "base64"));
+}
+
+importsRouter.post("/:accountId/icici-pdf/preview", async (req, res) => {
+  const parsed = indmoneyPdfPreviewSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const account = await prisma.account.findUnique({
+    where: { id: req.params.accountId },
+    include: { groups: { where: { archived: false } } },
+  });
+  if (!account) return res.status(404).json({ error: "Account not found" });
+
+  let result;
+  try {
+    result = await parseIciciPdfUpload(parsed.data.data);
+  } catch (e) {
+    return res.status(400).json({ error: e instanceof Error ? e.message : "Could not read this PDF" });
+  }
+
+  res.json({
+    parsedCount: result.rows.length + result.invalid.length,
+    invalidCount: result.invalid.length,
+    sampleRows: result.rows.slice(0, 10),
+    groups: account.groups,
+  });
+});
+
+importsRouter.post("/:accountId/icici-pdf/confirm", async (req, res) => {
+  const parsed = indmoneyPdfConfirmSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { filename, data, groupId, applyRules } = parsed.data;
+  const accountId = req.params.accountId;
+
+  const group = await prisma.group.findUnique({ where: { id: groupId } });
+  if (!group || group.accountId !== accountId) {
+    return res.status(400).json({ error: "Group does not belong to this account" });
+  }
+
+  let parsedPdf;
+  try {
+    parsedPdf = await parseIciciPdfUpload(data);
+  } catch (e) {
+    return res.status(400).json({ error: e instanceof Error ? e.message : "Could not read this PDF" });
+  }
+  const { rows: normalized, invalid } = parsedPdf;
+  const totalCount = normalized.length + invalid.length;
+
+  if (normalized.length === 0) {
+    return res.status(400).json({
+      error: `None of the ${totalCount} transaction(s) in this statement could be read.`,
+      invalidRowCount: invalid.length,
+      invalidSamples: invalid.slice(0, 5),
+    });
+  }
+
+  const result = await commitImportRows({
+    accountId,
+    groupId,
+    filename,
+    totalCount,
+    rows: normalized,
+    invalid,
+    applyRules,
+  });
+
+  res.status(201).json(result);
+});
+
+// Both credit card statement formats below share this exact preview/confirm
+// shape with the bank-statement PDF routes above - factored into one
+// registrar instead of pasting the same two handlers a third and fourth
+// time, parameterized only by which parser function to lazily load.
+function registerPdfImportRoutes(
+  path: string,
+  loadParser: () => Promise<{ default?: never } & Record<string, (buf: Buffer) => Promise<import("../services/csvImport").NormalizeResult>>>,
+  parserExportName: string,
+  unavailableMessage: string
+) {
+  async function parseUpload(data: string) {
+    const size = Buffer.byteLength(data, "base64");
+    if (size > MAX_UPLOAD_BYTES) {
+      throw new Error(`PDF too large (max ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB)`);
+    }
+    let mod: Record<string, (buf: Buffer) => Promise<import("../services/csvImport").NormalizeResult>>;
+    try {
+      mod = await loadParser();
+    } catch (e) {
+      console.error(`Failed to load parser module for ${path}:`, e);
+      throw new Error(unavailableMessage);
+    }
+    return mod[parserExportName](Buffer.from(data, "base64"));
+  }
+
+  importsRouter.post(`/:accountId/${path}/preview`, async (req, res) => {
+    const parsed = indmoneyPdfPreviewSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+    const account = await prisma.account.findUnique({
+      where: { id: req.params.accountId },
+      include: { groups: { where: { archived: false } } },
+    });
+    if (!account) return res.status(404).json({ error: "Account not found" });
+
+    let result;
+    try {
+      result = await parseUpload(parsed.data.data);
+    } catch (e) {
+      return res.status(400).json({ error: e instanceof Error ? e.message : "Could not read this PDF" });
+    }
+
+    res.json({
+      parsedCount: result.rows.length + result.invalid.length,
+      invalidCount: result.invalid.length,
+      sampleRows: result.rows.slice(0, 10),
+      groups: account.groups,
+    });
+  });
+
+  importsRouter.post(`/:accountId/${path}/confirm`, async (req, res) => {
+    const parsed = indmoneyPdfConfirmSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    const { filename, data, groupId, applyRules } = parsed.data;
+    const accountId = req.params.accountId;
+
+    const group = await prisma.group.findUnique({ where: { id: groupId } });
+    if (!group || group.accountId !== accountId) {
+      return res.status(400).json({ error: "Group does not belong to this account" });
+    }
+
+    let parsedPdf;
+    try {
+      parsedPdf = await parseUpload(data);
+    } catch (e) {
+      return res.status(400).json({ error: e instanceof Error ? e.message : "Could not read this PDF" });
+    }
+    const { rows: normalized, invalid } = parsedPdf;
+    const totalCount = normalized.length + invalid.length;
+
+    if (normalized.length === 0) {
+      return res.status(400).json({
+        error: `None of the ${totalCount} transaction(s) in this statement could be read.`,
+        invalidRowCount: invalid.length,
+        invalidSamples: invalid.slice(0, 5),
+      });
+    }
+
+    const result = await commitImportRows({
+      accountId,
+      groupId,
+      filename,
+      totalCount,
+      rows: normalized,
+      invalid,
+      applyRules,
+    });
+
+    res.status(201).json(result);
+  });
+}
+
+registerPdfImportRoutes(
+  "icici-cc-pdf",
+  () => import("../services/iciciCreditCardPdfImport.js"),
+  "parseIciciCreditCardPdf",
+  "ICICI credit card PDF import is temporarily unavailable - try CSV instead."
+);
+
+registerPdfImportRoutes(
+  "hdfc-cc-pdf",
+  () => import("../services/hdfcCreditCardPdfImport.js"),
+  "parseHdfcCreditCardPdf",
+  "HDFC credit card PDF import is temporarily unavailable - try CSV instead."
+);
 
 importsRouter.get("/:accountId/batches", async (req, res) => {
   const batches = await prisma.importBatch.findMany({

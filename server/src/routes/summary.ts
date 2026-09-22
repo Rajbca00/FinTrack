@@ -14,18 +14,20 @@ const filterSchema = z.object({
   // by the Dashboard's group-name filter to span every account sharing a
   // group name (e.g. "General"), since a name isn't one id.
   groupId: z.union([z.string(), z.array(z.string())]).optional(),
+  bucketId: z.string().optional(),
 });
 
 summaryRouter.get("/trend", async (req, res) => {
   const parsed = filterSchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { period, from, to, accountId, groupId } = parsed.data;
+  const { period, from, to, accountId, groupId, bucketId } = parsed.data;
   const trend = await getTrend({
     period,
     from: from ? new Date(from) : undefined,
     to: to ? new Date(to) : undefined,
     accountId,
     groupId,
+    bucketId,
   });
   res.json(trend);
 });
@@ -35,12 +37,13 @@ const breakdownSchema = filterSchema.extend({ type: z.enum(["INCOME", "EXPENSE"]
 summaryRouter.get("/breakdown", async (req, res) => {
   const parsed = breakdownSchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { from, to, accountId, groupId, type } = parsed.data;
+  const { from, to, accountId, groupId, bucketId, type } = parsed.data;
   const breakdown = await getCategoryBreakdown({
     from: from ? new Date(from) : undefined,
     to: to ? new Date(to) : undefined,
     accountId,
     groupId,
+    bucketId,
     type,
   });
   res.json(breakdown);

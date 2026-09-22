@@ -16,7 +16,7 @@ datasource db {
 // These fields are kept as plain Strings (constrained by the zod schemas in
 // each route handler) rather than native Postgres enums, so the app code
 // didn't need to change when the datasource moved from SQLite to Postgres:
-//   AccountType:  BANK | CREDIT_CARD
+//   AccountType:  BANK | CREDIT_CARD | CASH
 //   CategoryType: INCOME | EXPENSE | TRANSFER
 //   MatchType:    CONTAINS | STARTS_WITH | REGEX | EXACT
 //   TransferType: ACCOUNT_TRANSFER | GROUP_REALLOCATION
@@ -69,6 +69,24 @@ model Group {
   @@unique([accountId, name])
 }
 
+// A cross-account "purpose" ledger (e.g. "Temple", "Laya&Bee") that behaves
+// like its own lightweight account: any transaction from any real
+// Account/card can optionally be tagged into a Bucket, and its balance is
+// openingBalance plus the sum of every transaction tagged with it -
+// regardless of which real account actually paid. Deliberately independent
+// of Group (which is scoped to one Account and models money physically set
+// aside inside it) since a bucket's spending can come from any card/cash.
+model Bucket {
+  id             String        @id @default(cuid())
+  name           String        @unique
+  color          String?
+  openingBalance Float         @default(0)
+  archived       Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  transactions   Transaction[]
+}
+
 model Category {
   id           String         @id @default(cuid())
   name         String         @unique
@@ -113,6 +131,15 @@ model Transaction {
   amount         Float        // positive = inflow/credit, negative = outflow/debit
   categoryId     String?
   category       Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  // Optional cross-account "purpose" tag - see Bucket's own comment. Kept
+  // independent of Group/accountId so a Temple/Laya&Bee-style bucket can be
+  // funded from any account or card.
+  bucketId       String?
+  bucket         Bucket?      @relation(fields: [bucketId], references: [id], onDelete: SetNull)
+  // A one-off/non-monthly expense (e.g. buying a purifier, a trip) flagged
+  // out of budget/spend-rate reporting so it doesn't skew "normal month"
+  // numbers, while still being visible in its own breakdown.
+  isNonBudget    Boolean      @default(false)
   notes          String?
   isTransfer     Boolean      @default(false)
   transferId     String?
@@ -127,6 +154,7 @@ model Transaction {
   @@index([accountId, date])
   @@index([groupId])
   @@index([categoryId])
+  @@index([bucketId])
   @@unique([accountId, dedupeKey])
 }
 

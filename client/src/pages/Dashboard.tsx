@@ -26,8 +26,9 @@ import {
   useNetWorth,
   useNetWorthTrend,
   useTrend,
+  useTransactions,
 } from "../hooks/useApi";
-import { Card, Select, Label, ProgressBar, Badge, StatCard, ChartTooltip } from "../components/ui";
+import { Card, Button, Select, Label, ProgressBar, Badge, StatCard, ChartTooltip } from "../components/ui";
 import { formatMoney, formatDate } from "../lib/format";
 import { CHROME, DIVERGING, categoricalColor } from "../lib/palette";
 import { usePersistentState } from "../hooks/usePersistentState";
@@ -54,12 +55,18 @@ export function Dashboard() {
   const [accountId, setAccountId] = usePersistentState("fintrack.dashboard.accountId", "");
   // Filters the report sections (trend/breakdown/category-trend) below by
   // group *name* rather than a single group id, since a name like "General"
-  // exists once per account - defaults to "General" so a Temple Fund-style
-  // secondary group doesn't silently skew the main financial reports.
-  const [groupName, setGroupName] = usePersistentState("fintrack.dashboard.groupName", "General");
+  // exists once per account. Defaults to "" (all groups, matching the
+  // Account filter's "all accounts" default) - a Temple Fund-style
+  // secondary purpose is now tracked via Buckets instead, so there's no
+  // longer a good reason to silently exclude a second group's real
+  // transactions from the account-wide totals by default.
+  const [groupName, setGroupName] = usePersistentState("fintrack.dashboard.groupName", "");
   // Only meaningful when period === "month" - lets the charts narrow down to
   // one specific month instead of showing the whole transaction history.
   const [selectedMonth, setSelectedMonth] = usePersistentState("fintrack.dashboard.selectedMonth", "");
+  // Collapsed by default on phones so filter controls don't push every
+  // number below the fold - always shown on sm+ regardless of this.
+  const [showFilters, setShowFilters] = useState(false);
 
   const groupNames = useMemo(() => {
     const names = new Set<string>();
@@ -111,6 +118,20 @@ export function Dashboard() {
     groupId: reportGroupIds,
     ...monthRange,
   });
+  // One-off/non-monthly expenses (see the "non-budget" flag on Add/Edit
+  // transaction) are surfaced on their own here rather than folded into the
+  // Income vs expense chart above, since mixing them in would make a normal
+  // month look artificially high or low around a single big purchase or trip.
+  const { data: nonBudgetData } = useTransactions({
+    isNonBudget: true,
+    accountId: accountId || undefined,
+    ...monthRange,
+    pageSize: 50,
+  });
+  const nonBudgetTotal = useMemo(
+    () => (nonBudgetData?.transactions ?? []).reduce((sum, t) => sum + Math.abs(t.amount), 0),
+    [nonBudgetData]
+  );
 
   // Runs independently of the Period/Month pickers above (those narrow
   // everything else to one window) - "month on month" only means something
@@ -198,7 +219,10 @@ export function Dashboard() {
         <p className="text-sm text-ink-muted">An overview of your money across accounts and funds.</p>
       </div>
 
-      <Card className="flex flex-wrap items-end gap-4">
+      <Button variant="secondary" className="sm:hidden" onClick={() => setShowFilters((v) => !v)}>
+        {showFilters ? "Hide filters" : "Filters"}
+      </Button>
+      <Card className={`${showFilters ? "flex" : "hidden"} flex-wrap items-end gap-4 sm:flex`}>
         <div className="w-40">
           <Label>Period</Label>
           <Select
@@ -380,6 +404,31 @@ export function Dashboard() {
             <BillGroupColumn title="Due this week" bills={billData?.groups.dueThisWeek ?? []} />
             <BillGroupColumn title="Due this month" bills={billData?.groups.dueThisMonth ?? []} />
           </div>
+        </Card>
+      )}
+
+      {(nonBudgetData?.transactions.length ?? 0) > 0 && (
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink-secondary">
+              Non-budget expenses{currentPeriod ? ` — ${currentPeriod.label}` : ""}
+            </h2>
+            <p className="text-sm font-semibold text-ink">{formatMoney(nonBudgetTotal)}</p>
+          </div>
+          <p className="text-xs text-ink-muted">
+            One-off purchases (a purifier, a trip, etc) flagged out of normal monthly spend so they don't skew it.
+          </p>
+          <ul className="flex flex-col gap-1.5">
+            {nonBudgetData?.transactions.map((t) => (
+              <li key={t.id} className="flex items-center justify-between text-sm">
+                <span className="text-ink-secondary">
+                  {t.description}
+                  {t.category ? ` · ${t.category.name}` : ""}
+                </span>
+                <span className="font-medium text-ink">{formatMoney(Math.abs(t.amount))}</span>
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
 

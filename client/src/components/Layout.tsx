@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { to: "/budgets", label: "Budgets", tabLabel: "Budgets", icon: IconPie, primary: false },
   { to: "/bills", label: "Bills", tabLabel: "Bills", icon: IconCalendar, primary: false },
   { to: "/accounts", label: "Accounts", tabLabel: "Accounts", icon: IconBank, primary: true },
+  { to: "/buckets", label: "Buckets", tabLabel: "Buckets", icon: IconBucket, primary: false },
   { to: "/transactions", label: "Transactions", tabLabel: "Activity", icon: IconList, primary: true },
   { to: "/transfers", label: "Transfers", tabLabel: "Transfers", icon: IconSwap, primary: false },
   { to: "/categories", label: "Categories & Rules", tabLabel: "Categories", icon: IconTag, primary: false },
@@ -283,6 +284,15 @@ function IconBank({ className }: IconProps) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 10 12 4l9 6" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 10v9M10 10v9M14 10v9M19 10v9M3 19h18" />
+    </svg>
+  );
+}
+
+function IconBucket({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16l-1.5 13a2 2 0 0 1-2 1.8H7.5a2 2 0 0 1-2-1.8L4 7Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3Z" />
     </svg>
   );
 }

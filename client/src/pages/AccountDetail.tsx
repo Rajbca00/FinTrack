@@ -15,7 +15,7 @@ import { Card, Button, Modal, Input, Label, Badge, EmptyState, Loading, Select, 
 import { ImportWizard } from "../components/ImportWizard";
 import { TransactionTable } from "../components/TransactionTable";
 import { AddTransactionModal } from "../components/AddTransactionModal";
-import { formatMoney } from "../lib/format";
+import { formatMoney, ACCOUNT_TYPE_LABELS } from "../lib/format";
 import type { Account } from "../lib/api";
 
 export function AccountDetail() {
@@ -80,7 +80,7 @@ export function AccountDetail() {
           </Link>
           <h1 className="text-xl font-semibold text-ink">{account.name}</h1>
           <p className="text-sm text-ink-muted">
-            {account.type === "BANK" ? "Bank account" : "Credit card"}
+            {ACCOUNT_TYPE_LABELS[account.type] ?? account.type}
             {account.institution ? ` · ${account.institution}` : ""}
             {account.last4 ? ` · ••${account.last4}` : ""}
           </p>
