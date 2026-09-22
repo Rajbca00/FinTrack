@@ -173,6 +173,18 @@ export function useBulkMoveGroup() {
   });
 }
 
+export function useBulkMoveBucket() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ transactionIds, bucketId }: { transactionIds: string[]; bucketId: string | null }) =>
+      api.bulkMoveBucket(transactionIds, bucketId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["buckets"] });
+    },
+  });
+}
+
 export function useBulkDeleteTransactions() {
   const qc = useQueryClient();
   return useMutation({
@@ -236,6 +248,7 @@ export function useTrend(params: {
   to?: string;
   accountId?: string;
   groupId?: string | string[];
+  bucketId?: string;
 }) {
   return useQuery({ queryKey: ["trend", params], queryFn: () => api.getTrend(params) });
 }
@@ -245,6 +258,7 @@ export function useBreakdown(params: {
   to?: string;
   accountId?: string;
   groupId?: string | string[];
+  bucketId?: string;
   type: "INCOME" | "EXPENSE";
 }) {
   return useQuery({ queryKey: ["breakdown", params], queryFn: () => api.getBreakdown(params) });
@@ -388,6 +402,32 @@ export function useDeleteBudget() {
 
 export function useBudgetMonthlyTrend(months = 6) {
   return useQuery({ queryKey: ["budgets", "monthly-trend", months], queryFn: () => api.getBudgetMonthlyTrend(months) });
+}
+
+export function useBuckets() {
+  return useQuery({ queryKey: ["buckets"], queryFn: api.listBuckets });
+}
+
+export function useBucket(id: string | undefined) {
+  return useQuery({ queryKey: ["buckets", id], queryFn: () => api.getBucket(id!), enabled: !!id });
+}
+
+export function useCreateBucket() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.createBucket, onSuccess: () => qc.invalidateQueries({ queryKey: ["buckets"] }) });
+}
+
+export function useUpdateBucket() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<api.Bucket> }) => api.updateBucket(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["buckets"] }),
+  });
+}
+
+export function useDeleteBucket() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.deleteBucket, onSuccess: () => qc.invalidateQueries({ queryKey: ["buckets"] }) });
 }
 
 export function useBills() {

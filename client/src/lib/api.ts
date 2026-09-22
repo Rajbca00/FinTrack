@@ -25,7 +25,7 @@ export function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong";
 }
 
-export type AccountType = "BANK" | "CREDIT_CARD";
+export type AccountType = "BANK" | "CREDIT_CARD" | "CASH";
 export type CategoryType = "INCOME" | "EXPENSE" | "TRANSFER";
 export type MatchType = "CONTAINS" | "STARTS_WITH" | "REGEX" | "EXACT";
 export type AmountSign = "ANY" | "DEBIT" | "CREDIT";
@@ -87,6 +87,18 @@ export type CategoryRule = {
   notes: string | null;
 };
 
+export type Bucket = {
+  id: string;
+  name: string;
+  color: string | null;
+  openingBalance: number;
+  archived: boolean;
+  balance: number;
+  totalReceived: number;
+  totalSpent: number;
+  transactionCount: number;
+};
+
 export type Transaction = {
   id: string;
   accountId: string;
@@ -96,12 +108,15 @@ export type Transaction = {
   rawDescription: string | null;
   amount: number;
   categoryId: string | null;
+  bucketId: string | null;
+  isNonBudget: boolean;
   notes: string | null;
   isTransfer: boolean;
   transferId: string | null;
   category?: Category | null;
   group?: Group;
   account?: Account;
+  bucket?: Bucket | null;
 };
 
 export type Transfer = {
@@ -173,6 +188,8 @@ export type TransactionListParams = {
   accountId?: string;
   groupId?: string;
   categoryId?: string;
+  bucketId?: string;
+  isNonBudget?: boolean;
   type?: "INCOME" | "EXPENSE";
   from?: string;
   to?: string;
@@ -197,9 +214,20 @@ export const deleteTransaction = (id: string) => api.delete(`/transactions/${id}
 export const bulkCategorize = (transactionIds: string[], categoryId: string) =>
   api.post("/transactions/bulk-categorize", { transactionIds, categoryId });
 export const bulkMoveGroup = (transactionIds: string[], groupId: string) =>
-  api.post("/transactions/bulk-move-group", { transactionIds, groupId });
+  api.post<{ updated: number; requested: number }>("/transactions/bulk-move-group", { transactionIds, groupId }).then((r) => r.data);
+export const bulkMoveBucket = (transactionIds: string[], bucketId: string | null) =>
+  api.post("/transactions/bulk-move-bucket", { transactionIds, bucketId });
 export const bulkDeleteTransactions = (transactionIds: string[]) =>
   api.post<{ deleted: number }>("/transactions/bulk-delete", { transactionIds }).then((r) => r.data);
+
+// --- Buckets ---
+export const listBuckets = () => api.get<Bucket[]>("/buckets").then((r) => r.data);
+export const createBucket = (data: { name: string; color?: string; openingBalance?: number }) =>
+  api.post<Bucket>("/buckets", data).then((r) => r.data);
+export const updateBucket = (id: string, data: Partial<{ name: string; color: string | null; openingBalance: number }>) =>
+  api.put<Bucket>(`/buckets/${id}`, data).then((r) => r.data);
+export const deleteBucket = (id: string) => api.delete(`/buckets/${id}`);
+export const getBucket = (id: string) => api.get<Bucket>(`/buckets/${id}`).then((r) => r.data);
 
 // --- Import ---
 export type ImportPreview = {
@@ -223,8 +251,11 @@ export type ImportPreview = {
   // when the file never disambiguates itself.
   suggestedDateFormat: DateFormat;
 };
-export const previewImport = (accountId: string, fileContent: string, filename: string) =>
-  api.post<ImportPreview>(`/import/${accountId}/preview`, { fileContent, filename }).then((r) => r.data);
+// `file` is either the raw CSV text (fileContent) or a base64-encoded
+// .xlsx/.xls file (data) - the server tells them apart the same way the
+// PDF importers do.
+export const previewImport = (accountId: string, file: { fileContent?: string; data?: string }, filename: string) =>
+  api.post<ImportPreview>(`/import/${accountId}/preview`, { ...file, filename }).then((r) => r.data);
 
 // Which position the day falls in for ambiguous slash/dash dates like
 // "07/10/2026" - there's no way to tell from a single value, so this has to
@@ -242,7 +273,7 @@ export type ColumnMapping = {
 };
 export type InvalidImportRow = {
   rowIndex: number;
-  reason: "invalid_date" | "missing_description" | "invalid_amount";
+  reason: "invalid_date" | "missing_description" | "invalid_amount" | "uncertain_sign";
   dateRaw: string;
   descriptionRaw: string;
 };
@@ -258,7 +289,7 @@ export type ImportResult = {
 
 export const confirmImport = (
   accountId: string,
-  payload: { fileContent: string; filename: string; mapping: ColumnMapping; groupId: string; applyRules: boolean }
+  payload: { fileContent?: string; data?: string; filename: string; mapping: ColumnMapping; groupId: string; applyRules: boolean }
 ) => api.post<ImportResult>(`/import/${accountId}/confirm`, payload).then((r) => r.data);
 
 // --- IndMoney JSON import ---
@@ -290,6 +321,34 @@ export const confirmIndmoneyPdfImport = (
   payload: { filename: string; data: string; groupId: string; applyRules: boolean }
 ) => api.post<ImportResult>(`/import/${accountId}/indmoney-pdf/confirm`, payload).then((r) => r.data);
 
+// --- ICICI Bank PDF statement import ---
+// Same shape/flow as the IndMoney PDF source above, for ICICI's own
+// "Statement of Transactions" PDF export - see server/src/services/iciciPdfImport.ts.
+export const previewIciciPdfImport = (accountId: string, payload: { filename: string; data: string }) =>
+  api.post<IndmoneyPreview>(`/import/${accountId}/icici-pdf/preview`, payload).then((r) => r.data);
+export const confirmIciciPdfImport = (
+  accountId: string,
+  payload: { filename: string; data: string; groupId: string; applyRules: boolean }
+) => api.post<ImportResult>(`/import/${accountId}/icici-pdf/confirm`, payload).then((r) => r.data);
+
+// --- ICICI / HDFC credit card PDF statement import ---
+// Same shape/flow again, for the two banks' credit card statement exports -
+// see server/src/services/iciciCreditCardPdfImport.ts and
+// hdfcCreditCardPdfImport.ts.
+export const previewIciciCcPdfImport = (accountId: string, payload: { filename: string; data: string }) =>
+  api.post<IndmoneyPreview>(`/import/${accountId}/icici-cc-pdf/preview`, payload).then((r) => r.data);
+export const confirmIciciCcPdfImport = (
+  accountId: string,
+  payload: { filename: string; data: string; groupId: string; applyRules: boolean }
+) => api.post<ImportResult>(`/import/${accountId}/icici-cc-pdf/confirm`, payload).then((r) => r.data);
+
+export const previewHdfcCcPdfImport = (accountId: string, payload: { filename: string; data: string }) =>
+  api.post<IndmoneyPreview>(`/import/${accountId}/hdfc-cc-pdf/preview`, payload).then((r) => r.data);
+export const confirmHdfcCcPdfImport = (
+  accountId: string,
+  payload: { filename: string; data: string; groupId: string; applyRules: boolean }
+) => api.post<ImportResult>(`/import/${accountId}/hdfc-cc-pdf/confirm`, payload).then((r) => r.data);
+
 // --- Transfers ---
 export const listTransfers = () => api.get<Transfer[]>("/transfers").then((r) => r.data);
 export const createTransfer = (data: Record<string, unknown>) => api.post<Transfer>("/transfers", data).then((r) => r.data);
@@ -307,6 +366,7 @@ export const getTrend = (params: {
   to?: string;
   accountId?: string;
   groupId?: string | string[];
+  bucketId?: string;
 }) => api.get<TrendPoint[]>("/summary/trend", { params }).then((r) => r.data);
 export const getBreakdown = (params: {
   period?: "week" | "month" | "year";
@@ -314,6 +374,7 @@ export const getBreakdown = (params: {
   to?: string;
   accountId?: string;
   groupId?: string | string[];
+  bucketId?: string;
   type: "INCOME" | "EXPENSE";
 }) => api.get<BreakdownPoint[]>("/summary/breakdown", { params }).then((r) => r.data);
 export const getBalances = () => api.get<AccountBalance[]>("/summary/balances").then((r) => r.data);

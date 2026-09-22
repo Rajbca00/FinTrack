@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subMonths, format } from "date-fns";
+import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subMonths, addMonths, format } from "date-fns";
 import { prisma } from "../lib/prisma";
 
 export const budgetsRouter = Router();
@@ -65,8 +65,23 @@ budgetsRouter.get("/monthly-trend", async (req, res) => {
   if (budgets.length === 0) return res.json({ months: [], totalPlanned: 0 });
 
   const now = new Date();
-  const rangeStart = startOfMonth(subMonths(now, months - 1));
+  const requestedRangeStart = startOfMonth(subMonths(now, months - 1));
   const categoryIds = Array.from(new Set(budgets.map((b) => b.categoryId)));
+
+  // Trims leading months that predate any real activity, so a budget
+  // created recently (or a lookback window longer than the account's
+  // history) doesn't render as a wall of flat zero-spend bars that reads
+  // as "broken" rather than "no data yet".
+  const [earliestTxn, earliestBudget] = await Promise.all([
+    prisma.transaction.aggregate({ where: { categoryId: { in: categoryIds }, amount: { lt: 0 } }, _min: { date: true } }),
+    prisma.budget.aggregate({ where: { archived: false }, _min: { createdAt: true } }),
+  ]);
+  const earliestActivity = [earliestTxn._min.date, earliestBudget._min.createdAt]
+    .filter((d): d is Date => d != null)
+    .sort((a, b) => a.getTime() - b.getTime())[0];
+  const rangeStart = earliestActivity
+    ? new Date(Math.max(requestedRangeStart.getTime(), startOfMonth(earliestActivity).getTime()))
+    : requestedRangeStart;
 
   const txns = await prisma.transaction.findMany({
     where: { categoryId: { in: categoryIds }, amount: { lt: 0 }, date: { gte: rangeStart, lte: endOfMonth(now) } },
@@ -80,9 +95,8 @@ budgetsRouter.get("/monthly-trend", async (req, res) => {
   }
 
   const result = [];
-  for (let i = months - 1; i >= 0; i--) {
-    const d = subMonths(now, i);
-    const key = format(startOfMonth(d), "yyyy-MM");
+  for (let d = rangeStart; d <= now; d = addMonths(d, 1)) {
+    const key = format(d, "yyyy-MM");
     result.push({ month: key, label: format(d, "MMM yyyy"), planned: totalPlanned, spent: spentByMonth.get(key) ?? 0 });
   }
 

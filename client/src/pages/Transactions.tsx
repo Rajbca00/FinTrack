@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { useAccounts, useCategories, useTransactions, useApplyRules } from "../hooks/useApi";
+import { useAccounts, useBuckets, useCategories, useTransactions, useApplyRules } from "../hooks/useApi";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { TransactionTable } from "../components/TransactionTable";
 import { AddTransactionModal } from "../components/AddTransactionModal";
-import { Card, Button, Select, Input, Label, Loading } from "../components/ui";
+import { Card, Button, Select, Input, Label, Loading, Toast } from "../components/ui";
 import { assignableCategories } from "../lib/api";
 import { groupDisplayName } from "../lib/format";
 import { parseSearchQuery } from "../lib/search";
@@ -11,17 +11,24 @@ import { parseSearchQuery } from "../lib/search";
 export function Transactions() {
   const { data: accounts } = useAccounts();
   const { data: categories } = useCategories();
+  const { data: buckets } = useBuckets();
   // Filters persist across reloads/navigation (see usePersistentState) so
   // coming back to this page doesn't silently drop what you were looking at.
   const [accountId, setAccountId] = usePersistentState("fintrack.transactions.accountId", "");
   const [groupId, setGroupId] = usePersistentState("fintrack.transactions.groupId", "");
   const [categoryId, setCategoryId] = usePersistentState("fintrack.transactions.categoryId", "");
+  const [bucketId, setBucketId] = usePersistentState("fintrack.transactions.bucketId", "");
+  const [nonBudgetOnly, setNonBudgetOnly] = usePersistentState("fintrack.transactions.nonBudgetOnly", false);
   const [type, setType] = usePersistentState<"" | "INCOME" | "EXPENSE">("fintrack.transactions.type", "");
   const [q, setQ] = usePersistentState("fintrack.transactions.q", "");
   const [from, setFrom] = usePersistentState("fintrack.transactions.from", "");
   const [to, setTo] = usePersistentState("fintrack.transactions.to", "");
   const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
+  const [ruleApplyMessage, setRuleApplyMessage] = useState("");
+  // Collapsed by default on phones so the filter bar doesn't push every
+  // transaction below the fold - always shown on sm+ regardless of this.
+  const [showFilters, setShowFilters] = useState(false);
   const applyRules = useApplyRules();
 
   const selectedAccount = accounts?.find((a) => a.id === accountId);
@@ -36,6 +43,8 @@ export function Transactions() {
     accountId: accountId || undefined,
     groupId: groupId || undefined,
     categoryId: categoryId || undefined,
+    bucketId: bucketId || undefined,
+    isNonBudget: nonBudgetOnly || undefined,
     type: type || undefined,
     q: parsedSearch.text || undefined,
     from: from || parsedSearch.from || undefined,
@@ -63,7 +72,20 @@ export function Transactions() {
         <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
-            onClick={() => applyRules.mutate({ overwrite: false })}
+            onClick={() =>
+              applyRules.mutate(
+                { overwrite: false },
+                {
+                  onSuccess: (res) => {
+                    setRuleApplyMessage(
+                      res.updated > 0
+                        ? `Checked ${res.scanned} transaction(s), categorized ${res.updated}.`
+                        : `Checked ${res.scanned} transaction(s) - nothing new matched a rule.`
+                    );
+                  },
+                }
+              )
+            }
             disabled={applyRules.isPending}
           >
             {applyRules.isPending ? "Applying rules…" : "Re-run auto-categorization"}
@@ -72,7 +94,10 @@ export function Transactions() {
         </div>
       </div>
 
-      <Card className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
+      <Button variant="secondary" className="sm:hidden" onClick={() => setShowFilters((v) => !v)}>
+        {showFilters ? "Hide filters" : "Filters"}
+      </Button>
+      <Card className={`${showFilters ? "grid" : "hidden"} grid-cols-2 gap-3 sm:grid md:grid-cols-3 xl:grid-cols-8`}>
         <div>
           <Label>Account</Label>
           <Select
@@ -91,17 +116,19 @@ export function Transactions() {
             ))}
           </Select>
         </div>
-        <div>
-          <Label>Group</Label>
-          <Select value={groupId} onChange={(e) => { setGroupId(e.target.value); setPage(1); }}>
-            <option value="">All groups</option>
-            {(selectedAccount ? selectedAccount.groups : allGroups).map((g) => (
-              <option key={g.id} value={g.id}>
-                {groupDisplayName(g)}
-              </option>
-            ))}
-          </Select>
-        </div>
+        {allGroups.length > 1 && (
+          <div>
+            <Label>Group</Label>
+            <Select value={groupId} onChange={(e) => { setGroupId(e.target.value); setPage(1); }}>
+              <option value="">All groups</option>
+              {(selectedAccount ? selectedAccount.groups : allGroups).map((g) => (
+                <option key={g.id} value={g.id}>
+                  {groupDisplayName(g)}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
         <div>
           <Label>Category</Label>
           <Select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setPage(1); }}>
@@ -129,6 +156,26 @@ export function Transactions() {
         <div>
           <Label>To</Label>
           <Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
+        </div>
+        <div>
+          <Label>Bucket</Label>
+          <Select value={bucketId} onChange={(e) => { setBucketId(e.target.value); setPage(1); }}>
+            <option value="">All buckets</option>
+            {buckets?.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </Select>
+          <label className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-secondary">
+            <input
+              type="checkbox"
+              checked={nonBudgetOnly}
+              onChange={(e) => { setNonBudgetOnly(e.target.checked); setPage(1); }}
+              className="h-3.5 w-3.5 accent-brand"
+            />
+            One-off only
+          </label>
         </div>
         <div>
           <Label>Search</Label>
@@ -171,6 +218,7 @@ export function Transactions() {
       )}
 
       {showAdd && <AddTransactionModal onClose={() => setShowAdd(false)} />}
+      {ruleApplyMessage && <Toast message={ruleApplyMessage} actionLabel="Dismiss" onAction={() => setRuleApplyMessage("")} />}
     </div>
   );
 }

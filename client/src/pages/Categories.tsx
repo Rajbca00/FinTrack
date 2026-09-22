@@ -10,7 +10,7 @@ import {
   useDeleteRule,
   useApplyRules,
 } from "../hooks/useApi";
-import { Card, Button, Modal, Input, Select, Label, Badge, EmptyState } from "../components/ui";
+import { Card, Button, Modal, Input, Select, Label, Badge, EmptyState, Toast } from "../components/ui";
 import { assignableCategories } from "../lib/api";
 import type { AmountSign, Category, CategoryRule, CategoryType, MatchType } from "../lib/api";
 
@@ -25,6 +25,7 @@ export function Categories() {
   const [showAddRule, setShowAddRule] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingRule, setEditingRule] = useState<CategoryRule | null>(null);
+  const [ruleApplyMessage, setRuleApplyMessage] = useState("");
 
   return (
     <div className="flex flex-col gap-8">
@@ -69,8 +70,25 @@ export function Categories() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => applyRules.mutate({ overwrite: false })} disabled={applyRules.isPending}>
-              Apply to uncategorized
+            <Button
+              variant="secondary"
+              onClick={() =>
+                applyRules.mutate(
+                  { overwrite: false },
+                  {
+                    onSuccess: (res) => {
+                      setRuleApplyMessage(
+                        res.updated > 0
+                          ? `Checked ${res.scanned} transaction(s), categorized ${res.updated}.`
+                          : `Checked ${res.scanned} transaction(s) - nothing new matched a rule.`
+                      );
+                    },
+                  }
+                )
+              }
+              disabled={applyRules.isPending}
+            >
+              {applyRules.isPending ? "Applying…" : "Re-run auto-categorization"}
             </Button>
             <Button onClick={() => setShowAddRule(true)}>+ Add rule</Button>
           </div>
@@ -132,6 +150,7 @@ export function Categories() {
       {showAddRule && <AddRuleModal onClose={() => setShowAddRule(false)} />}
       {editingCategory && <EditCategoryModal category={editingCategory} onClose={() => setEditingCategory(null)} />}
       {editingRule && <EditRuleModal rule={editingRule} onClose={() => setEditingRule(null)} />}
+      {ruleApplyMessage && <Toast message={ruleApplyMessage} actionLabel="Dismiss" onAction={() => setRuleApplyMessage("")} />}
     </div>
   );
 }
@@ -178,6 +197,7 @@ function AddCategoryModal({ onClose }: { onClose: () => void }) {
 function AddRuleModal({ onClose }: { onClose: () => void }) {
   const { data: categories } = useCategories();
   const createRule = useCreateRule();
+  const applyRules = useApplyRules();
   const [pattern, setPattern] = useState("");
   const [matchType, setMatchType] = useState<MatchType>("CONTAINS");
   const [amountSign, setAmountSign] = useState<AmountSign>("ANY");
@@ -238,15 +258,24 @@ function AddRuleModal({ onClose }: { onClose: () => void }) {
           className="mt-2"
           disabled={!pattern.trim() || !categoryId}
           onClick={() => {
-            createRule.mutate({
-              pattern: pattern.trim(),
-              matchType,
-              amountSign,
-              categoryId,
-              priority: Number(priority) || 0,
-              notes: notes.trim() || null,
-            });
-            onClose();
+            createRule.mutate(
+              {
+                pattern: pattern.trim(),
+                matchType,
+                amountSign,
+                categoryId,
+                priority: Number(priority) || 0,
+                notes: notes.trim() || null,
+              },
+              {
+                onSuccess: () => {
+                  if (confirm("Apply this rule to existing uncategorized transactions now?")) {
+                    applyRules.mutate({ overwrite: false });
+                  }
+                  onClose();
+                },
+              }
+            );
           }}
         >
           Add rule

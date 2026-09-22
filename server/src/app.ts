@@ -22,6 +22,7 @@ import { assetsRouter } from "./routes/assets";
 import { liabilitiesRouter } from "./routes/liabilities";
 import { goalsRouter } from "./routes/goals";
 import { budgetsRouter } from "./routes/budgets";
+import { bucketsRouter } from "./routes/buckets";
 import { billsRouter } from "./routes/bills";
 import { merchantsRouter } from "./routes/merchants";
 import { attachmentsRouter } from "./routes/attachments";
@@ -47,6 +48,7 @@ export function createApp() {
   app.use("/api/liabilities", liabilitiesRouter);
   app.use("/api/goals", goalsRouter);
   app.use("/api/budgets", budgetsRouter);
+  app.use("/api/buckets", bucketsRouter);
   app.use("/api/bills", billsRouter);
   app.use("/api/merchants", merchantsRouter);
   app.use("/api", attachmentsRouter);

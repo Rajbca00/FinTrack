@@ -10,6 +10,8 @@ const listQuerySchema = z.object({
   accountId: z.string().optional(),
   groupId: z.string().optional(),
   categoryId: z.string().optional(),
+  bucketId: z.string().optional(),
+  isNonBudget: z.coerce.boolean().optional(),
   type: z.enum(["INCOME", "EXPENSE"]).optional(),
   from: z.string().optional(),
   to: z.string().optional(),
@@ -27,7 +29,7 @@ const listQuerySchema = z.object({
 transactionsRouter.get("/", async (req, res) => {
   const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { accountId, groupId, categoryId, type, from, to, q, minAmount, maxAmount, page, pageSize } = parsed.data;
+  const { accountId, groupId, categoryId, bucketId, isNonBudget, type, from, to, q, minAmount, maxAmount, page, pageSize } = parsed.data;
 
   // "uncategorized" is a client-side sentinel for categoryId: null (the
   // real "no category" state - see categorize()'s null return), not an
@@ -38,6 +40,8 @@ transactionsRouter.get("/", async (req, res) => {
     accountId,
     groupId,
     categoryId: categoryId === "uncategorized" ? null : categoryId,
+    bucketId,
+    isNonBudget,
     ...(type ? { isTransfer: false, amount: type === "INCOME" ? { gte: 0 } : { lt: 0 } } : {}),
     date: from || to ? { gte: from ? new Date(from) : undefined, lte: to ? new Date(to) : undefined } : undefined,
     description: q ? { contains: q, mode: "insensitive" as const } : undefined,
@@ -49,7 +53,7 @@ transactionsRouter.get("/", async (req, res) => {
     prisma.transaction.count({ where }),
     prisma.transaction.findMany({
       where,
-      include: { category: true, group: true, account: true },
+      include: { category: true, group: true, account: true, bucket: true },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -122,6 +126,8 @@ const createSchema = z.object({
   description: z.string().min(1),
   amount: z.number(),
   categoryId: z.string().optional().nullable(),
+  bucketId: z.string().optional().nullable(),
+  isNonBudget: z.boolean().optional(),
   notes: z.string().optional().nullable(),
 });
 
@@ -138,7 +144,7 @@ transactionsRouter.post("/", async (req, res) => {
 
   const transaction = await prisma.transaction.create({
     data: { ...data, date: new Date(data.date), categoryId, notes },
-    include: { category: true, group: true },
+    include: { category: true, group: true, bucket: true },
   });
   res.status(201).json(transaction);
 });
@@ -150,43 +156,65 @@ const updateSchema = z.object({
   categoryId: z.string().optional().nullable(),
   accountId: z.string().optional(),
   groupId: z.string().optional(),
+  bucketId: z.string().optional().nullable(),
+  isNonBudget: z.boolean().optional(),
   notes: z.string().optional().nullable(),
 });
 
 transactionsRouter.put("/:id", async (req, res) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { date, accountId, groupId, ...rest } = parsed.data;
+  const { date, accountId, groupId, categoryId, ...rest } = parsed.data;
 
   const existing = await prisma.transaction.findUnique({ where: { id: req.params.id } });
   if (!existing) return res.status(404).json({ error: "Transaction not found" });
 
-  // A transfer leg's account is locked - moving it here would desync it from
-  // its paired leg, so that stays on the Transfers view (same rule as delete).
-  if (existing.isTransfer && accountId && accountId !== existing.accountId) {
-    return res.status(400).json({ error: "Edit this from the Transfers view so both legs stay in sync" });
+  // A transfer leg's account/date/category are locked - changing any of them
+  // here would desync it from its paired leg (a different date/category on
+  // each row of the same transfer, or a moved account with an unmoved
+  // counterpart), so those stay on the Transfers view (same rule as delete).
+  // Amount and group are also client-disabled for the same reason, but are
+  // allowed through here since they aren't structurally paired the same way
+  // (group is per-leg by design, and Transfers already recomputes amount
+  // signs itself).
+  if (existing.isTransfer) {
+    if (accountId && accountId !== existing.accountId) {
+      return res.status(400).json({ error: "Edit this from the Transfers view so both legs stay in sync" });
+    }
+    if (date && new Date(date).getTime() !== existing.date.getTime()) {
+      return res.status(400).json({ error: "Edit this from the Transfers view so both legs stay in sync" });
+    }
+    if (categoryId !== undefined && categoryId !== existing.categoryId) {
+      return res.status(400).json({ error: "Edit this from the Transfers view so both legs stay in sync" });
+    }
   }
 
-  // Moving to a different account without an explicit group falls back to
-  // that account's default group, since the current groupId won't belong to it.
+  // Whichever account this transaction will belong to once this update
+  // applies - a provided groupId must always belong to THIS account, not
+  // just to `existing.accountId`, or a request that sends groupId without
+  // also sending accountId could silently attach a group from a completely
+  // different account (corrupting both accounts' balances) with no check
+  // at all, since the old code below only validated groupId when accountId
+  // was *also* present and different.
+  const effectiveAccountId = accountId ?? existing.accountId;
   let resolvedGroupId = groupId;
-  if (accountId && accountId !== existing.accountId) {
-    if (groupId) {
-      const group = await prisma.group.findUnique({ where: { id: groupId } });
-      if (!group || group.accountId !== accountId) {
-        return res.status(400).json({ error: "Group does not belong to the selected account" });
-      }
-    } else {
-      const defaultGroup = await prisma.group.findFirst({ where: { accountId, isDefault: true } });
-      if (!defaultGroup) return res.status(400).json({ error: "Selected account has no default group" });
-      resolvedGroupId = defaultGroup.id;
+  if (groupId) {
+    const group = await prisma.group.findUnique({ where: { id: groupId } });
+    if (!group || group.accountId !== effectiveAccountId) {
+      return res.status(400).json({ error: "Group does not belong to the selected account" });
     }
+  } else if (accountId && accountId !== existing.accountId) {
+    // Moving to a different account without an explicit group falls back to
+    // that account's default group, since the current groupId won't belong to it.
+    const defaultGroup = await prisma.group.findFirst({ where: { accountId, isDefault: true } });
+    if (!defaultGroup) return res.status(400).json({ error: "Selected account has no default group" });
+    resolvedGroupId = defaultGroup.id;
   }
 
   const transaction = await prisma.transaction.update({
     where: { id: req.params.id },
-    data: { ...rest, accountId, groupId: resolvedGroupId, date: date ? new Date(date) : undefined },
-    include: { category: true, group: true, account: true },
+    data: { ...rest, categoryId, accountId, groupId: resolvedGroupId, date: date ? new Date(date) : undefined },
+    include: { category: true, group: true, account: true, bucket: true },
   });
   res.json(transaction);
 });
@@ -223,9 +251,30 @@ const bulkMoveGroupSchema = z.object({
 transactionsRouter.post("/bulk-move-group", async (req, res) => {
   const parsed = bulkMoveGroupSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const group = await prisma.group.findUnique({ where: { id: parsed.data.groupId } });
+  if (!group) return res.status(400).json({ error: "Group not found" });
+  // Constrained to transactions that already belong to this group's account
+  // - selecting a group in one account's row from a cross-account transaction
+  // list must never silently reassign a different account's transaction to
+  // it, which would desync that transaction's accountId from its own group.
+  const { count } = await prisma.transaction.updateMany({
+    where: { id: { in: parsed.data.transactionIds }, accountId: group.accountId },
+    data: { groupId: parsed.data.groupId },
+  });
+  res.json({ updated: count, requested: parsed.data.transactionIds.length });
+});
+
+const bulkMoveBucketSchema = z.object({
+  transactionIds: z.array(z.string()).min(1),
+  bucketId: z.string().nullable(),
+});
+
+transactionsRouter.post("/bulk-move-bucket", async (req, res) => {
+  const parsed = bulkMoveBucketSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const { count } = await prisma.transaction.updateMany({
     where: { id: { in: parsed.data.transactionIds } },
-    data: { groupId: parsed.data.groupId },
+    data: { bucketId: parsed.data.bucketId },
   });
   res.json({ updated: count });
 });

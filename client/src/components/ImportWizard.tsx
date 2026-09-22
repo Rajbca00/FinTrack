@@ -7,17 +7,70 @@ import {
   confirmIndmoneyImport,
   previewIndmoneyPdfImport,
   confirmIndmoneyPdfImport,
+  previewIciciPdfImport,
+  confirmIciciPdfImport,
+  previewIciciCcPdfImport,
+  confirmIciciCcPdfImport,
+  previewHdfcCcPdfImport,
+  confirmHdfcCcPdfImport,
   getErrorMessage,
   type ColumnMapping,
   type DateFormat,
   type ImportPreview,
   type IndmoneyPreview,
+  type ImportResult,
 } from "../lib/api";
-import type { Group, ImportResult } from "../lib/api";
+import type { Group } from "../lib/api";
 import { formatDate, formatMoney } from "../lib/format";
 import { useQueryClient } from "@tanstack/react-query";
 
-type Source = "csv" | "indmoney" | "indmoney-pdf";
+// Every PDF statement source shares the exact same upload -> preview ->
+// review -> confirm flow, differing only in which parser the server runs
+// and how the tab/upload panel describes itself - kept in one table
+// instead of a separate state var + handler + tab + panel per bank, which
+// stopped scaling once a second bank's PDF format showed up.
+const PDF_SOURCES = {
+  "icici-pdf": {
+    label: "ICICI PDF",
+    description:
+      'Upload the "Statement of Transactions" PDF you can download from ICICI Bank\'s net banking or mobile app for a savings/current account.',
+    preview: previewIciciPdfImport,
+    confirm: confirmIciciPdfImport,
+  },
+  "icici-cc-pdf": {
+    label: "ICICI CC PDF",
+    description: 'Upload the "View Last Statement" PDF for an ICICI Bank credit card.',
+    preview: previewIciciCcPdfImport,
+    confirm: confirmIciciCcPdfImport,
+  },
+  "hdfc-cc-pdf": {
+    label: "HDFC CC PDF",
+    description: "Upload an HDFC Bank credit card statement PDF.",
+    preview: previewHdfcCcPdfImport,
+    confirm: confirmHdfcCcPdfImport,
+  },
+  "indmoney-pdf": {
+    label: "IndMoney PDF",
+    description:
+      'Upload the "Account Statement" PDF you can download per-account from IndMoney. Includes the bank\'s full transaction narration, unlike the app screen\'s JSON.',
+    preview: previewIndmoneyPdfImport,
+    confirm: confirmIndmoneyPdfImport,
+  },
+} satisfies Record<
+  string,
+  {
+    label: string;
+    description: string;
+    preview: (accountId: string, payload: { filename: string; data: string }) => Promise<IndmoneyPreview>;
+    confirm: (
+      accountId: string,
+      payload: { filename: string; data: string; groupId: string; applyRules: boolean }
+    ) => Promise<ImportResult>;
+  }
+>;
+type PdfSourceKey = keyof typeof PDF_SOURCES;
+
+type Source = "csv" | "indmoney" | PdfSourceKey;
 
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -54,7 +107,8 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<Mode>("select");
   const [filename, setFilename] = useState("");
-  const [fileContent, setFileContent] = useState("");
+  const [fileContent, setFileContent] = useState<string | undefined>(undefined);
+  const [fileData, setFileData] = useState<string | undefined>(undefined);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [amountMode, setAmountMode] = useState<"single" | "debitCredit">("debitCredit");
   const [dateColumn, setDateColumn] = useState("");
@@ -74,7 +128,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
   const [source, setSource] = useState<Source>("csv");
   const [indmoneyJsonText, setIndmoneyJsonText] = useState("");
   const [indmoneyPreview, setIndmoneyPreview] = useState<IndmoneyPreview | null>(null);
-  const [indmoneyPdfFile, setIndmoneyPdfFile] = useState<{ filename: string; data: string } | null>(null);
+  const [pdfFile, setPdfFile] = useState<{ filename: string; data: string } | null>(null);
 
   const applyMapping = (mapping: {
     dateColumn: string | null;
@@ -97,14 +151,19 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
     if (mapping.dateFormat) setDateFormat(mapping.dateFormat);
   };
 
+  const isSpreadsheet = (name: string) => /\.(xlsx|xls)$/i.test(name);
+
   const handleFile = async (file: File) => {
     setError("");
     setLoading(true);
     try {
-      const content = await file.text();
       setFilename(file.name);
-      setFileContent(content);
-      const p = await previewImport(accountId, content, file.name);
+      const file_ = isSpreadsheet(file.name)
+        ? { data: await readFileAsBase64(file) }
+        : { fileContent: await file.text() };
+      setFileContent(file_.fileContent);
+      setFileData(file_.data);
+      const p = await previewImport(accountId, file_, file.name);
       setPreview(p);
       if (p.savedMapping) {
         applyMapping(p.savedMapping);
@@ -134,7 +193,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
         amountMode === "single"
           ? { dateColumn, descriptionColumn, amountColumn, dateFormat }
           : { dateColumn, descriptionColumn, debitColumn, creditColumn, dateFormat };
-      const res = await confirmImport(accountId, { fileContent, filename, mapping, groupId, applyRules });
+      const res = await confirmImport(accountId, { fileContent, data: fileData, filename, mapping, groupId, applyRules });
       setResult(res);
       setMode("done");
       qc.invalidateQueries({ queryKey: ["transactions"] });
@@ -166,13 +225,16 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
     }
   };
 
-  const handleIndmoneyPdfFile = async (file: File) => {
+  const isPdfSource = (s: Source): s is PdfSourceKey => s in PDF_SOURCES;
+
+  const handlePdfFile = async (file: File) => {
+    if (!isPdfSource(source)) return;
     setError("");
     setLoading(true);
     try {
       const data = await readFileAsBase64(file);
-      const p = await previewIndmoneyPdfImport(accountId, { filename: file.name, data });
-      setIndmoneyPdfFile({ filename: file.name, data });
+      const p = await PDF_SOURCES[source].preview(accountId, { filename: file.name, data });
+      setPdfFile({ filename: file.name, data });
       setIndmoneyPreview(p);
       if (!p.groups.some((g) => g.id === groupId)) {
         setGroupId(p.groups.find((g) => g.isDefault)?.id ?? p.groups[0]?.id ?? "");
@@ -190,8 +252,8 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
     setLoading(true);
     try {
       const res =
-        source === "indmoney-pdf" && indmoneyPdfFile
-          ? await confirmIndmoneyPdfImport(accountId, { ...indmoneyPdfFile, groupId, applyRules })
+        isPdfSource(source) && pdfFile
+          ? await PDF_SOURCES[source].confirm(accountId, { ...pdfFile, groupId, applyRules })
           : await confirmIndmoneyImport(accountId, { jsonText: indmoneyJsonText, groupId, applyRules });
       setResult(res);
       setMode("done");
@@ -209,7 +271,7 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
     <Modal title="Import statement" onClose={onClose} wide>
       {mode === "select" && (
         <div className="flex flex-col gap-4">
-          <div className="flex justify-center gap-1 rounded-lg bg-black/5 p-1 dark:bg-white/5">
+          <div className="flex flex-wrap justify-center gap-1 rounded-lg bg-black/5 p-1 dark:bg-white/5">
             <button
               className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                 source === "csv" ? "bg-brand text-white" : "text-ink-secondary hover:text-ink"
@@ -221,6 +283,20 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
             >
               Bank CSV
             </button>
+            {(Object.keys(PDF_SOURCES) as PdfSourceKey[]).map((key) => (
+              <button
+                key={key}
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  source === key ? "bg-brand text-white" : "text-ink-secondary hover:text-ink"
+                }`}
+                onClick={() => {
+                  setSource(key);
+                  setError("");
+                }}
+              >
+                {PDF_SOURCES[key].label}
+              </button>
+            ))}
             <button
               className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                 source === "indmoney" ? "bg-brand text-white" : "text-ink-secondary hover:text-ink"
@@ -232,31 +308,21 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
             >
               IndMoney JSON
             </button>
-            <button
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                source === "indmoney-pdf" ? "bg-brand text-white" : "text-ink-secondary hover:text-ink"
-              }`}
-              onClick={() => {
-                setSource("indmoney-pdf");
-                setError("");
-              }}
-            >
-              IndMoney PDF
-            </button>
           </div>
+          <p className="text-center text-xs text-ink-muted">
+            "IndMoney" here means the IndMoney investing app specifically - only pick those two if that's where your
+            statement is coming from.
+          </p>
 
-          {source === "indmoney-pdf" ? (
+          {isPdfSource(source) ? (
             <div className="flex flex-col items-center gap-4 py-4 text-center">
-              <p className="text-sm text-ink-secondary">
-                Upload the "Account Statement" PDF you can download per-account from IndMoney. Includes the bank's full
-                transaction narration, unlike the app screen's JSON.
-              </p>
+              <p className="text-sm text-ink-secondary">{PDF_SOURCES[source].description}</p>
               <input
                 ref={pdfInputRef}
                 type="file"
                 accept=".pdf,application/pdf"
                 className="hidden"
-                onChange={(e) => e.target.files?.[0] && handleIndmoneyPdfFile(e.target.files[0])}
+                onChange={(e) => e.target.files?.[0] && handlePdfFile(e.target.files[0])}
               />
               <Button onClick={() => pdfInputRef.current?.click()} disabled={loading}>
                 {loading ? "Reading PDF…" : "Choose PDF statement"}
@@ -265,18 +331,18 @@ export function ImportWizard({ accountId, groups, onClose }: { accountId: string
           ) : source === "csv" ? (
             <div className="flex flex-col items-center gap-4 py-4 text-center">
               <p className="text-sm text-ink-secondary">
-                Upload a CSV export of your bank or credit card statement. Works with common formats
-                (Date/Narration/Debit/Credit, or Date/Description/Amount).
+                Upload a CSV or Excel (.xlsx/.xls) export of your bank or credit card statement. Works with common
+                formats (Date/Narration/Debit/Credit, or Date/Description/Amount).
               </p>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,text/csv,.xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className="hidden"
                 onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
               />
               <Button onClick={() => fileInputRef.current?.click()} disabled={loading}>
-                {loading ? "Reading file…" : "Choose CSV file"}
+                {loading ? "Reading file…" : "Choose CSV or Excel file"}
               </Button>
             </div>
           ) : (

@@ -18,6 +18,12 @@ export function groupDisplayName(group: { name: string; accountName?: string }):
   return group.accountName ? `${group.accountName} - ${group.name}` : group.name;
 }
 
+export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  BANK: "Bank account",
+  CREDIT_CARD: "Credit card",
+  CASH: "Cash",
+};
+
 export const ASSET_TYPE_LABELS: Record<string, string> = {
   FIXED_DEPOSIT: "Fixed Deposit",
   MUTUAL_FUND: "Mutual Fund",

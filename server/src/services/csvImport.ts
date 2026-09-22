@@ -132,7 +132,12 @@ export type InvalidRow = {
   // "invalid_amount" is unused by the CSV path today (parseAmount defaults
   // unparseable values to 0 rather than failing) but is here so other import
   // sources - e.g. the IndMoney JSON importer - can share this exact type.
-  reason: "invalid_date" | "missing_description" | "invalid_amount";
+  // "uncertain_sign" is specific to bank-statement PDF parsers (see
+  // iciciPdfImport.ts): a statement's very first transaction has no prior
+  // balance to diff against, so whether it was a debit or credit can't be
+  // derived the way every later row's can - rather than guess on money, it's
+  // reported here as skipped so the user can add it manually if they want it.
+  reason: "invalid_date" | "missing_description" | "invalid_amount" | "uncertain_sign";
   dateRaw: string;
   descriptionRaw: string;
 };

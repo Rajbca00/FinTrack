@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAccounts, useCreateAccount, useBalances, useArchiveAccount } from "../hooks/useApi";
 import { Card, Button, Modal, Input, Select, Label, Badge, EmptyState, Loading } from "../components/ui";
-import { formatMoney } from "../lib/format";
+import { formatMoney, ACCOUNT_TYPE_LABELS } from "../lib/format";
 import type { AccountType } from "../lib/api";
 
 export function Accounts() {
@@ -44,7 +44,7 @@ export function Accounts() {
                     {account.name}
                   </Link>
                   <p className="text-xs text-ink-muted">
-                    {account.type === "BANK" ? "Bank account" : "Credit card"}
+                    {ACCOUNT_TYPE_LABELS[account.type] ?? account.type}
                     {account.institution ? ` · ${account.institution}` : ""}
                     {account.last4 ? ` · ••${account.last4}` : ""}
                   </p>
@@ -128,6 +128,7 @@ function CreateAccountModal({
           <Select value={type} onChange={(e) => setType(e.target.value as AccountType)}>
             <option value="BANK">Bank account</option>
             <option value="CREDIT_CARD">Credit card</option>
+            <option value="CASH">Cash</option>
           </Select>
         </div>
         <div className="grid grid-cols-2 gap-3">

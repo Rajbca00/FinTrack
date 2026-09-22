@@ -6,7 +6,7 @@ export const accountsRouter = Router();
 
 const accountSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(["BANK", "CREDIT_CARD"]),
+  type: z.enum(["BANK", "CREDIT_CARD", "CASH"]),
   institution: z.string().optional().nullable(),
   last4: z.string().optional().nullable(),
   currency: z.string().default("INR"),

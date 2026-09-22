@@ -3,12 +3,14 @@ import type { Category, Group, SimilarTransaction, Transaction } from "../lib/ap
 import { assignableCategories, getErrorMessage, getSimilarTransactions } from "../lib/api";
 import {
   useAccounts,
+  useBuckets,
   useDeleteTransaction,
   useUpdateTransaction,
   useCreateTransfer,
   useCreateRule,
   useBulkCategorize,
   useBulkMoveGroup,
+  useBulkMoveBucket,
   useBulkDeleteTransactions,
 } from "../hooks/useApi";
 import { Button, Modal, Input, Select, Label, EmptyState, Toast } from "./ui";
@@ -42,9 +44,11 @@ export function TransactionTable({
   const deleteTransaction = useDeleteTransaction();
   const bulkCategorize = useBulkCategorize();
   const bulkMoveGroup = useBulkMoveGroup();
+  const bulkMoveBucket = useBulkMoveBucket();
   const bulkDelete = useBulkDeleteTransactions();
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [moveGroupWarning, setMoveGroupWarning] = useState("");
 
   // Deleting hides the row immediately and gives a few seconds to undo
   // before the API call actually fires, instead of a confirm() dialog up
@@ -80,6 +84,17 @@ export function TransactionTable({
     () => transactions.filter((t) => t.id !== pendingDelete?.id),
     [transactions, pendingDelete]
   );
+
+  // Whether the "Group" column is worth showing at all - `groups` can span
+  // multiple accounts (see Transactions.tsx), so its own length alone isn't
+  // enough: two single-group accounts would make `groups.length` 2 without
+  // any row actually having more than one group to pick between.
+  const anyMultiGroupAccount = useMemo(() => {
+    if (!groups) return false;
+    const byAccount = new Map<string, number>();
+    for (const g of groups) byAccount.set(g.accountId, (byAccount.get(g.accountId) ?? 0) + 1);
+    return Array.from(byAccount.values()).some((n) => n > 1);
+  }, [groups]);
 
   // After a manual category pick (the quick inline Select, not the full Edit
   // modal), check whether other transactions share this description and
@@ -147,7 +162,22 @@ export function TransactionTable({
             bulkCategorize.mutate({ transactionIds: Array.from(selectedIds), categoryId }, { onSuccess: clearSelection });
           }}
           onMoveGroup={(groupId) => {
-            bulkMoveGroup.mutate({ transactionIds: Array.from(selectedIds), groupId }, { onSuccess: clearSelection });
+            bulkMoveGroup.mutate(
+              { transactionIds: Array.from(selectedIds), groupId },
+              {
+                onSuccess: (res) => {
+                  clearSelection();
+                  if (res.updated < res.requested) {
+                    setMoveGroupWarning(
+                      `Moved ${res.updated} of ${res.requested} - the rest belong to a different account than that group.`
+                    );
+                  }
+                },
+              }
+            );
+          }}
+          onMoveBucket={(bucketId) => {
+            bulkMoveBucket.mutate({ transactionIds: Array.from(selectedIds), bucketId }, { onSuccess: clearSelection });
           }}
           onDelete={() => {
             if (!confirm(`Delete ${selectedCount} transaction(s)? This can't be undone.`)) return;
@@ -210,18 +240,31 @@ export function TransactionTable({
                     </option>
                   ))}
                 </Select>
-                {groups && groups.length > 1 && (
-                  <Select
-                    value={t.groupId}
-                    onChange={(e) => updateTransaction.mutate({ id: t.id, data: { groupId: e.target.value } })}
-                    className="w-auto rounded-full border-hairline-strong bg-black/5 py-1 pl-2.5 text-xs dark:bg-white/5"
-                  >
-                    {groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {groupDisplayName(g)}
-                      </option>
-                    ))}
-                  </Select>
+                {(() => {
+                  const ownGroups = groups?.filter((g) => g.accountId === t.accountId) ?? [];
+                  return (
+                    ownGroups.length > 1 && (
+                      <Select
+                        value={t.groupId}
+                        onChange={(e) => updateTransaction.mutate({ id: t.id, data: { groupId: e.target.value } })}
+                        className="w-auto rounded-full border-hairline-strong bg-black/5 py-1 pl-2.5 text-xs dark:bg-white/5"
+                      >
+                        {ownGroups.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name}
+                          </option>
+                        ))}
+                      </Select>
+                    )
+                  );
+                })()}
+                {t.bucket && (
+                  <span className="inline-flex items-center rounded-full border border-hairline-strong px-2.5 py-1 text-xs text-ink-secondary">
+                    {t.bucket.name}
+                  </span>
+                )}
+                {t.isNonBudget && (
+                  <span className="inline-flex items-center rounded-full bg-brand/10 px-2.5 py-1 text-xs text-brand">One-off</span>
                 )}
               </div>
 
@@ -266,7 +309,7 @@ export function TransactionTable({
               <th className="px-4 py-2 font-medium">Date</th>
               <th className="px-4 py-2 font-medium">Description</th>
               {showAccountColumn && <th className="px-4 py-2 font-medium">Account</th>}
-              {groups && groups.length > 1 && <th className="px-4 py-2 font-medium">Group</th>}
+              {anyMultiGroupAccount && <th className="px-4 py-2 font-medium">Group</th>}
               <th className="px-4 py-2 font-medium">Category</th>
               <th className="px-4 py-2 font-medium">Notes</th>
               <th className="px-4 py-2 text-right font-medium">Amount</th>
@@ -290,28 +333,46 @@ export function TransactionTable({
                 </td>
                 <td className="whitespace-nowrap px-4 py-2 text-ink-secondary">{formatDate(t.date)}</td>
               <td className="max-w-xs px-4 py-2 text-ink">
-                <div className="truncate" title={t.description}>
-                  {t.description}
+                <div className="flex items-center gap-1.5">
+                  <div className="truncate" title={t.description}>
+                    {t.description}
+                  </div>
+                  {t.bucket && (
+                    <span className="shrink-0 rounded-full border border-hairline-strong px-1.5 py-0.5 text-[10px] text-ink-secondary">
+                      {t.bucket.name}
+                    </span>
+                  )}
+                  {t.isNonBudget && (
+                    <span className="shrink-0 rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] text-brand">One-off</span>
+                  )}
                 </div>
               </td>
               {showAccountColumn && (
                 <td className="whitespace-nowrap px-4 py-2 text-ink-secondary">{t.account?.name}</td>
               )}
-              {groups && groups.length > 1 && (
-                <td className="px-4 py-2">
-                  <Select
-                    value={t.groupId}
-                    onChange={(e) => updateTransaction.mutate({ id: t.id, data: { groupId: e.target.value } })}
-                    className="min-w-[9rem]"
-                  >
-                    {groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {groupDisplayName(g)}
-                      </option>
-                    ))}
-                  </Select>
-                </td>
-              )}
+              {anyMultiGroupAccount &&
+                (() => {
+                  const ownGroups = groups?.filter((g) => g.accountId === t.accountId) ?? [];
+                  return (
+                    <td className="px-4 py-2">
+                      {ownGroups.length > 1 ? (
+                        <Select
+                          value={t.groupId}
+                          onChange={(e) => updateTransaction.mutate({ id: t.id, data: { groupId: e.target.value } })}
+                          className="min-w-[9rem]"
+                        >
+                          {ownGroups.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        <span className="text-ink-secondary">{t.group?.name}</span>
+                      )}
+                    </td>
+                  );
+                })()}
               <td className="px-4 py-2">
                 <Select
                   value={t.categoryId ?? ""}
@@ -362,6 +423,9 @@ export function TransactionTable({
       {pendingDelete && (
         <Toast message={`Deleted "${pendingDelete.description}"`} actionLabel="Undo" onAction={undoDelete} />
       )}
+      {moveGroupWarning && (
+        <Toast message={moveGroupWarning} actionLabel="Dismiss" onAction={() => setMoveGroupWarning("")} />
+      )}
 
       {ruleSuggestion && (
         <RuleSuggestionModal
@@ -395,6 +459,7 @@ function BulkActionsBar({
   onClear,
   onCategorize,
   onMoveGroup,
+  onMoveBucket,
   onDelete,
 }: {
   count: number;
@@ -403,8 +468,10 @@ function BulkActionsBar({
   onClear: () => void;
   onCategorize: (categoryId: string) => void;
   onMoveGroup: (groupId: string) => void;
+  onMoveBucket: (bucketId: string) => void;
   onDelete: () => void;
 }) {
+  const { data: buckets } = useBuckets();
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-brand/10 px-4 py-2 text-sm">
       <span className="font-medium text-ink-secondary">{count} selected</span>
@@ -438,6 +505,22 @@ function BulkActionsBar({
           ))}
         </Select>
       )}
+      {buckets && buckets.length > 0 && (
+        <Select
+          className="w-auto min-w-40"
+          value=""
+          onChange={(e) => {
+            if (e.target.value) onMoveBucket(e.target.value);
+          }}
+        >
+          <option value="">Move to bucket…</option>
+          {buckets.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </Select>
+      )}
       <Button variant="danger" onClick={onDelete}>
         Delete
       </Button>
@@ -460,13 +543,17 @@ function EditTransactionModal({
   onSave: (patch: Partial<Transaction>) => void;
 }) {
   const { data: accounts } = useAccounts();
+  const { data: buckets } = useBuckets();
   const createTransfer = useCreateTransfer();
   const deleteTransaction = useDeleteTransaction();
 
   const [date, setDate] = useState(toDateInputValue(transaction.date));
   const [description, setDescription] = useState(transaction.description);
-  const [amount, setAmount] = useState(String(transaction.amount));
+  const [amount, setAmount] = useState(String(Math.abs(transaction.amount)));
+  const [type, setType] = useState<"EXPENSE" | "INCOME">(transaction.amount >= 0 ? "INCOME" : "EXPENSE");
   const [categoryId, setCategoryId] = useState(transaction.categoryId ?? "");
+  const [bucketId, setBucketId] = useState(transaction.bucketId ?? "");
+  const [isNonBudget, setIsNonBudget] = useState(transaction.isNonBudget);
   const [notes, setNotes] = useState(transaction.notes ?? "");
   const [accountId, setAccountId] = useState(transaction.accountId);
   const [groupId, setGroupId] = useState(transaction.groupId);
@@ -489,6 +576,12 @@ function EditTransactionModal({
   return (
     <Modal title="Edit transaction" onClose={onClose}>
       <div className="flex flex-col gap-3">
+        {transaction.isTransfer && (
+          <p className="rounded-lg bg-brand/10 px-3 py-2 text-xs text-ink-secondary">
+            This is one leg of a transfer. Account, group, amount, date, and category are locked here so the two
+            linked legs can't drift apart - edit those from the Transfers page instead.
+          </p>
+        )}
         <div>
           <Label>Account</Label>
           <Select
@@ -521,19 +614,50 @@ function EditTransactionModal({
         )}
         <div>
           <Label>Date</Label>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={transaction.isTransfer} />
         </div>
         <div>
           <Label>Description</Label>
           <Input value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
+        {!transaction.isTransfer && (
+          <div>
+            <Label>Type</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={type === "EXPENSE" ? "primary" : "secondary"}
+                className="flex-1"
+                onClick={() => setType("EXPENSE")}
+              >
+                Expense
+              </Button>
+              <Button
+                type="button"
+                variant={type === "INCOME" ? "primary" : "secondary"}
+                className="flex-1"
+                onClick={() => setType("INCOME")}
+              >
+                Income
+              </Button>
+            </div>
+          </div>
+        )}
         <div>
-          <Label>Amount (negative = money out, positive = money in)</Label>
-          <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={transaction.isTransfer} />
+          <Label>Amount</Label>
+          <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={transaction.isTransfer} />
         </div>
         <div>
           <Label>Category</Label>
-          <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          <Select
+            value={categoryId}
+            onChange={(e) => {
+              setCategoryId(e.target.value);
+              const category = categories.find((c) => c.id === e.target.value);
+              if (category?.type === "INCOME" || category?.type === "EXPENSE") setType(category.type);
+            }}
+            disabled={transaction.isTransfer}
+          >
             <option value="">Uncategorized</option>
             {assignableCategories(categories).map((c) => (
               <option key={c.id} value={c.id}>
@@ -542,6 +666,30 @@ function EditTransactionModal({
             ))}
           </Select>
         </div>
+        {!transaction.isTransfer && (
+          <>
+            <div>
+              <Label>Bucket (optional)</Label>
+              <Select value={bucketId} onChange={(e) => setBucketId(e.target.value)}>
+                <option value="">None</option>
+                {buckets?.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-ink-secondary">
+              <input
+                type="checkbox"
+                checked={isNonBudget}
+                onChange={(e) => setIsNonBudget(e.target.checked)}
+                className="h-4 w-4 accent-brand"
+              />
+              One-off / non-budget expense
+            </label>
+          </>
+        )}
         {convertingToTransfer && (
           <>
             <p className="text-xs text-ink-muted">
@@ -592,7 +740,7 @@ function EditTransactionModal({
           onClick={() => {
             if (convertingToTransfer) {
               const legAmount = Math.abs(Number(amount));
-              const outgoing = Number(amount) < 0;
+              const outgoing = type === "EXPENSE";
               createTransfer.mutate(
                 {
                   type: "ACCOUNT_TRANSFER",
@@ -610,8 +758,10 @@ function EditTransactionModal({
               onSave({
                 date: new Date(date).toISOString(),
                 description,
-                amount: transaction.isTransfer ? undefined : Number(amount),
+                amount: transaction.isTransfer ? undefined : type === "INCOME" ? Math.abs(Number(amount)) : -Math.abs(Number(amount)),
                 categoryId: categoryId || null,
+                bucketId: bucketId || null,
+                isNonBudget,
                 notes: notes || null,
                 accountId: transaction.isTransfer ? undefined : accountId,
                 groupId: transaction.isTransfer ? undefined : groupId,
